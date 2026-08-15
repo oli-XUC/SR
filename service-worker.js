@@ -1,4 +1,4 @@
-const CACHE_NAME = 'service-report-github-pages-v18';
+const CACHE_NAME = 'service-report-github-pages-v19';
 const GENERATED_PDF_CACHE = 'service-report-generated-pdf-v1';
 const APP_SHELL = [
   './',
@@ -34,21 +34,27 @@ self.addEventListener('fetch', event => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response.ok) {
-            const responseCopy = response.clone();
-            event.waitUntil(
-              caches.open(CACHE_NAME)
-                .then(cache => cache.put('./index.html', responseCopy))
+      caches.open(GENERATED_PDF_CACHE)
+        .then(cache => cache.match(event.request))
+        .then(cachedPdf => {
+          if (cachedPdf) return cachedPdf;
+
+          return fetch(event.request)
+            .then(response => {
+              if (response.ok) {
+                const responseCopy = response.clone();
+                event.waitUntil(
+                  caches.open(CACHE_NAME)
+                    .then(cache => cache.put('./index.html', responseCopy))
+                );
+              }
+              return response;
+            })
+            .catch(() =>
+              caches.match(event.request)
+                .then(cached => cached || caches.match('./index.html'))
             );
-          }
-          return response;
         })
-        .catch(() =>
-          caches.match(event.request)
-            .then(cached => cached || caches.match('./index.html'))
-        )
     );
     return;
   }
