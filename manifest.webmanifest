@@ -1,0 +1,37 @@
+{
+  "name": "售后服务工作时间表/报告 · PWA",
+  "short_name": "服务报告",
+  "description": "通过 HTTPS 安装、可在 iPhone 和 Android 离线填写和签字的售后服务报告",
+  "id": "./?build=github-pages-v17",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#eef0f2",
+  "theme_color": "#c91d23",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

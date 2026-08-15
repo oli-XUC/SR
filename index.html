@@ -1,0 +1,2539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#c91d23">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="服务报告">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <title>售后服务工作时间表/报告 · PWA</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #000;
+      --paper: #fff;
+      --ui-red: #c91d23;
+      --ui-dark: #202124;
+      --ui-line: #dadce0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; min-height: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+    body {
+      background: #eef0f2;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      min-height: 58px;
+      padding: 9px 16px;
+      color: #fff;
+      background: rgba(32, 33, 36, .96);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+    }
+
+    .toolbar button {
+      appearance: none;
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 18px;
+      color: #fff;
+      background: var(--ui-red);
+      font: 600 14px/1 "Microsoft YaHei", sans-serif;
+      cursor: pointer;
+    }
+
+    .toolbar button:hover { background: #a9161b; }
+
+    .toolbar button.secondary {
+      border: 1px solid #74777c;
+      padding: 8px 14px;
+      color: #f1f3f4;
+      background: #3c4043;
+    }
+
+    .toolbar button.secondary:hover { background: #4b4f52; }
+
+    .toolbar-note {
+      flex: 1 1 360px;
+      max-width: 620px;
+      color: #e8eaed;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .toolbar-note a { color: #a8c7fa; }
+
+    .private-badge {
+      flex: 0 0 auto;
+      border: 1px solid rgba(138, 225, 175, .75);
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: #b7f7d0;
+      background: rgba(14, 108, 71, .28);
+      font: 700 10px/1 "Microsoft YaHei", sans-serif;
+      letter-spacing: .4px;
+      white-space: nowrap;
+    }
+
+    .stage {
+      display: flex;
+      justify-content: center;
+      padding: 22px 16px 40px;
+    }
+
+    .sheet {
+      position: relative;
+      flex: 0 0 auto;
+      width: 210mm;
+      height: 297mm;
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: 0 5px 28px rgba(0, 0, 0, .16);
+    }
+
+    .report-title {
+      position: absolute;
+      top: 8.06mm;
+      left: 17.52mm;
+      width: 91mm;
+      height: 8.94mm;
+      margin: 0;
+      font: 700 14pt/8.94mm "Microsoft YaHei", "微软雅黑", sans-serif;
+      white-space: nowrap;
+    }
+
+    .english-title {
+      position: absolute;
+      top: 17.00mm;
+      left: 17.52mm;
+      margin: 0;
+      font: 700 12pt/1 "Times New Roman", serif;
+      letter-spacing: 0;
+    }
+
+    .english-title span { display: block; }
+    .english-title span:first-child { line-height: 4.71mm; }
+    .english-title span:last-child { line-height: 5.08mm; }
+
+    .brand-logo {
+      position: absolute;
+      top: 8.23mm;
+      left: 117.77mm;
+      width: 75.57mm;
+      height: 17.23mm;
+      object-fit: fill;
+    }
+
+    .header-image {
+      position: absolute;
+      top: 4.65mm;
+      left: 16.77mm;
+      width: 178.36mm;
+      height: 21.56mm;
+      object-fit: fill;
+    }
+
+    .table-wrap {
+      position: absolute;
+      top: 26.75mm;
+      left: 16.77mm;
+      width: 178.36mm;
+      height: 224.42mm;
+    }
+
+    table.report-table {
+      width: 178.36mm;
+      height: 224.42mm;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border: .70mm solid #000;
+      color: var(--ink);
+      font-family: Arial, "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.03;
+    }
+
+    .report-table col:nth-child(1) { width: 33.16mm; }
+    .report-table col:nth-child(2) { width: 17.85mm; }
+    .report-table col:nth-child(3) { width: 9.74mm; }
+    .report-table col:nth-child(4) { width: 17.57mm; }
+    .report-table col:nth-child(5) { width: 14.98mm; }
+    .report-table col:nth-child(6) { width: 12.40mm; }
+    .report-table col:nth-child(7) { width: 15.17mm; }
+    .report-table col:nth-child(8) { width: 26.30mm; }
+    .report-table col:nth-child(9) { width: 31.19mm; }
+
+    .report-table tr { overflow: hidden; }
+    .report-table tr.r1 { height: 8.03mm; }
+    .report-table tr.r2 { height: 7.99mm; }
+    .report-table tr.r3 { height: 7.73mm; }
+    .report-table tr.r4 { height: 7.80mm; }
+    .report-table tr.r5 { height: 10.64mm; }
+    .report-table tr.r6 { height: 7.81mm; }
+    .report-table tr.r7 { height: 8.50mm; }
+    .report-table tr.r8 { height: 8.50mm; }
+    .report-table tr.r9 { height: 15.00mm; }
+    .report-table tr.r10 { height: 10.60mm; }
+    .report-table tr.r11 { height: 8.03mm; }
+    .report-table tr.r12 { height: 7.97mm; }
+    .report-table tr.r13 { height: 12.00mm; }
+    .report-table tr.daily { height: 6.58mm; }
+    .report-table tr.r20 { height: 36.66mm; }
+    .report-table tr.r21 { height: 27.69mm; }
+
+    .report-table td {
+      position: relative;
+      height: inherit;
+      padding: .55mm 1.05mm;
+      overflow: hidden;
+      vertical-align: middle;
+      border: .52mm solid #000;
+      background: #fff;
+    }
+
+    .report-table td.label {
+      padding-left: 1.88mm;
+      font-size: 10.5pt;
+    }
+
+    .report-table td.center {
+      padding-left: .55mm;
+      padding-right: .55mm;
+      text-align: center;
+    }
+
+    .report-table td.compact-label { font-size: 9pt; }
+
+    .inline-label {
+      padding-left: .75mm !important;
+      padding-right: .45mm !important;
+      font-size: 8.2pt !important;
+      white-space: nowrap;
+    }
+
+    .reference-label {
+      padding-left: .75mm !important;
+      font-size: 8.8pt !important;
+      white-space: nowrap;
+    }
+
+    .lined-field::before,
+    .lined-field::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      left: 0;
+      right: 0;
+      height: .22mm;
+      background: #000;
+      pointer-events: none;
+    }
+
+    .lined-field::before { top: 33.333%; }
+    .lined-field::after { top: 66.666%; }
+    .lined-field .field { position: relative; z-index: 1; }
+
+    .stacked {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .45mm;
+      text-align: center;
+    }
+
+    .field-cell { padding: 0 !important; }
+
+    input.field,
+    select.field,
+    textarea.field {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      outline: 0;
+      padding: .4mm 1.15mm;
+      color: #000;
+      background: transparent;
+      font: 9pt/1.1 "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+      box-shadow: none;
+    }
+
+    input.field:focus,
+    select.field:focus,
+    textarea.field:focus {
+      box-shadow: inset 0 0 0 1.2px #1a73e8;
+      background: #f7fbff;
+    }
+
+    input.field::placeholder,
+    textarea.field::placeholder { color: #8a8a8a; }
+
+    select.field {
+      appearance: auto;
+      cursor: pointer;
+      padding-left: .65mm;
+      padding-right: .4mm;
+      font-size: 7.7pt;
+    }
+
+    .with-action { padding-right: 17mm !important; }
+
+    .cell-action {
+      position: absolute;
+      top: 50%;
+      right: 1.2mm;
+      z-index: 3;
+      transform: translateY(-50%);
+      border: 1px solid #b7b7b7;
+      border-radius: 3px;
+      padding: 2px 5px;
+      color: #333;
+      background: #f7f7f7;
+      font: 10px/1.15 "Microsoft YaHei", sans-serif;
+      cursor: pointer;
+    }
+
+    .cell-action:hover { background: #ececec; }
+
+    .inline-field {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+    }
+
+    .field-prefix {
+      flex: 0 0 auto;
+      padding-left: 1.15mm;
+      font-size: 8.6pt;
+      white-space: nowrap;
+    }
+
+    .inline-field .field {
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      padding-left: .7mm;
+    }
+
+    .service-options {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(6, minmax(0, 1fr));
+      align-content: center;
+      gap: .2mm;
+      width: 100%;
+      height: 100%;
+      padding: .2mm 0;
+      font-size: 7.15pt;
+      line-height: 1;
+    }
+
+    .service-options label {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .service-options input {
+      width: 3.1mm;
+      height: 3.1mm;
+      margin: 0 .75mm 0 0;
+      accent-color: #000;
+    }
+
+    .service-options .wide { grid-column: auto; }
+
+    .signature-header-small {
+      font: 5.1pt/1.05 "Times New Roman", serif;
+      white-space: nowrap;
+    }
+
+    .compact-suggestions {
+      position: fixed;
+      z-index: 260;
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid #aeb4ba;
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
+    }
+
+    .compact-suggestions[hidden] { display: none; }
+
+    .compact-suggestions button {
+      display: block;
+      width: 100%;
+      border: 0;
+      padding: 4px 9px;
+      text-align: left;
+      color: #202124;
+      background: #fff;
+      font: 12px/1.1 Arial, sans-serif;
+      cursor: pointer;
+    }
+
+    .compact-suggestions button:hover,
+    .compact-suggestions button:focus { outline: 0; background: #edf3fb; }
+
+    .weekday {
+      text-align: center;
+      font-size: 8.2pt !important;
+    }
+
+    .daily input.field { text-align: center; font-size: 8.2pt; }
+
+    .notes-cell { padding: 0 !important; }
+
+    .notes-field {
+      resize: none;
+      padding: 2.2mm !important;
+      font-size: 9.5pt !important;
+      line-height: 1.42 !important;
+    }
+
+    .signature-cell {
+      padding: 0 !important;
+      border-top: 1.5pt double #000 !important;
+    }
+
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 50.73% 49.27%;
+      width: 100%;
+      height: 100%;
+    }
+
+    .signature-party {
+      position: relative;
+      display: grid;
+      grid-template-rows: 5mm 8.5mm 4.3mm 5.2mm;
+      min-width: 0;
+      padding: 0 1.15mm 1.3mm;
+    }
+
+    .signature-party + .signature-party { border-left: 0 solid transparent; }
+
+    .party-name {
+      display: flex;
+      align-items: center;
+      font-size: 10.5pt;
+      white-space: nowrap;
+    }
+
+    .signature-entry {
+      position: relative;
+      min-height: 0;
+    }
+
+    .signature-entry input {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font: italic 13pt/1.1 "Segoe Script", "KaiTi", cursive;
+    }
+
+    .customer-signature-entry {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px dashed #a7abb0;
+      border-radius: 4px;
+      background: #fafafa;
+      cursor: pointer;
+    }
+
+    .signature-launch {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      padding: 0 2mm;
+      color: #5f6368;
+      background: transparent;
+      font: 8pt/1.25 "Microsoft YaHei", sans-serif;
+      cursor: pointer;
+    }
+
+    .captured-signature {
+      display: block;
+      width: 45%;
+      height: 94%;
+      margin: auto;
+      object-fit: fill;
+      pointer-events: none;
+    }
+
+    .captured-signature[hidden] { display: none; }
+
+    .signature-label {
+      display: flex;
+      align-items: center;
+      font-size: 10.5pt;
+      overflow: visible;
+    }
+
+    .signature-date-line {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: .7mm;
+      font-size: 10.5pt;
+      white-space: nowrap;
+    }
+
+    .signature-date-line input {
+      height: 4mm;
+      padding: 0 .65mm;
+      font-size: 8.2pt;
+      line-height: 4mm;
+    }
+
+    .office-footer {
+      position: absolute;
+      top: 267.0mm;
+      left: 6.0mm;
+      width: 198.0mm;
+      height: 20.75mm;
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .office-footer img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+    .page-number {
+      position: absolute;
+      top: 280.30mm;
+      left: 180.20mm;
+      width: 9.80mm;
+      height: 3.16mm;
+      font: 8pt/1 "Times New Roman", serif;
+      white-space: nowrap;
+      z-index: -1;
+    }
+
+    .location-panel {
+      position: fixed;
+      z-index: 200;
+      top: 72px;
+      left: 50%;
+      width: min(620px, calc(100vw - 28px));
+      max-height: min(68vh, 560px);
+      transform: translateX(-50%);
+      overflow: auto;
+      border: 1px solid var(--ui-line);
+      border-radius: 9px;
+      background: #fff;
+      box-shadow: 0 12px 38px rgba(0, 0, 0, .28);
+    }
+
+    .location-panel[hidden] { display: none; }
+
+    .panel-head {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #ececec;
+      background: #fff;
+    }
+
+    .panel-head strong { font-size: 15px; }
+
+    .panel-head button {
+      border: 0;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .nearby-list { padding: 5px 0; }
+
+    .nearby-choice {
+      display: block;
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid #f0f0f0;
+      padding: 11px 14px;
+      text-align: left;
+      color: #202124;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .nearby-choice:hover { background: #f7f9fb; }
+    .nearby-choice b { display: block; margin-bottom: 3px; font-size: 14px; }
+    .nearby-choice span { display: block; color: #5f6368; font-size: 12px; line-height: 1.35; }
+    .panel-message { padding: 22px 14px; color: #5f6368; text-align: center; font-size: 13px; }
+
+    .nearby-entry { padding: 14px; }
+    .nearby-entry p { margin: 0 0 10px; color: #5f6368; font-size: 12px; line-height: 1.5; }
+    .nearby-entry label { display: block; margin: 9px 0 4px; font-size: 12px; font-weight: 600; }
+    .nearby-entry input {
+      width: 100%;
+      border: 1px solid #bdc1c6;
+      border-radius: 4px;
+      padding: 8px 9px;
+      font: 13px/1.25 "Microsoft YaHei", sans-serif;
+    }
+    .nearby-map-link,
+    .nearby-apply {
+      display: inline-block;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 5px;
+      padding: 8px 13px;
+      color: #fff;
+      background: var(--ui-red);
+      font: 600 13px/1.2 "Microsoft YaHei", sans-serif;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .nearby-apply { margin-left: 7px; background: #3c4043; }
+
+    .config-form { padding: 16px 16px 18px; }
+    .config-form label { display: block; margin-bottom: 7px; color: #202124; font-size: 13px; font-weight: 600; }
+    .config-form input {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid #bdc1c6;
+      border-radius: 5px;
+      padding: 9px 10px;
+      font: 13px/1.3 Consolas, monospace;
+    }
+    .config-help { margin: 9px 0 15px; color: #5f6368; font-size: 12px; line-height: 1.5; }
+    .config-help a { color: #1967d2; }
+    .config-actions { display: flex; justify-content: flex-end; gap: 9px; }
+    .config-actions button {
+      border: 1px solid #c7c7c7;
+      border-radius: 5px;
+      padding: 8px 15px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .config-actions button.primary { border-color: var(--ui-red); color: #fff; background: var(--ui-red); }
+
+    .install-content {
+      padding: 16px;
+      color: #202124;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .install-content p { margin: 0 0 10px; }
+    .install-content ol { margin: 4px 0 0; padding-left: 23px; }
+
+    .signature-pad-modal {
+      position: fixed;
+      z-index: 400;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background: rgba(12, 14, 16, .76);
+      overscroll-behavior: contain;
+    }
+
+    .signature-pad-modal[hidden] { display: none; }
+
+    .signature-pad-card {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      width: min(1000px, 96vw);
+      height: min(700px, 86vh);
+      height: min(700px, 86dvh);
+      overflow: hidden;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .38);
+    }
+
+    .signature-pad-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 16px;
+      border-bottom: 1px solid #e3e5e8;
+    }
+
+    .signature-pad-head h2 { margin: 0; font-size: 17px; }
+    .signature-pad-head span { color: #5f6368; font-size: 12px; font-weight: 400; }
+
+    .signature-pad-close {
+      flex: 0 0 auto;
+      width: 36px;
+      height: 36px;
+      border: 0;
+      border-radius: 50%;
+      color: #202124;
+      background: #f1f3f4;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .signature-canvas-wrap {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(#fff, #fff) padding-box,
+        repeating-linear-gradient(0deg, transparent, transparent 39px, #eef0f2 40px) border-box;
+    }
+
+    .signature-canvas-wrap::after {
+      content: "请在此签名 / Sign here";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: #d2d5d9;
+      font: 600 clamp(18px, 4vw, 38px)/1.2 "Microsoft YaHei", sans-serif;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .signature-canvas-wrap.has-ink::after { display: none; }
+
+    #signatureCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .signature-pad-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      border-top: 1px solid #e3e5e8;
+      background: #fff;
+    }
+
+    .pen-status { margin-right: auto; color: #5f6368; font-size: 12px; }
+
+    .signature-pad-actions button {
+      border: 1px solid #c4c7c5;
+      border-radius: 7px;
+      padding: 9px 16px;
+      color: #202124;
+      background: #fff;
+      font: 600 14px/1 "Microsoft YaHei", sans-serif;
+      cursor: pointer;
+    }
+
+    .signature-pad-actions button.primary {
+      border-color: var(--ui-red);
+      color: #fff;
+      background: var(--ui-red);
+    }
+
+    .pdf-ready-panel {
+      position: fixed;
+      z-index: 1200;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(12, 14, 16, .72);
+    }
+
+    .pdf-ready-panel[hidden] { display: none; }
+    .pdf-ready-card {
+      width: min(430px, 100%);
+      border-radius: 15px;
+      padding: 20px;
+      background: #fff;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .36);
+      text-align: center;
+    }
+    .pdf-ready-card h2 { margin: 0 0 8px; font-size: 21px; }
+    .pdf-ready-card p { margin: 0 0 16px; color: #5f6368; font-size: 14px; line-height: 1.5; }
+    .pdf-ready-actions { display: grid; gap: 9px; }
+    .pdf-ready-actions button {
+      min-height: 46px;
+      border: 1px solid #b7bbc0;
+      border-radius: 9px;
+      color: #292d31;
+      background: #f7f8f9;
+      font: 600 16px/1.2 -apple-system, "Microsoft YaHei", sans-serif;
+    }
+    .pdf-ready-actions button.primary { border-color: var(--ui-red); color: #fff; background: var(--ui-red); }
+
+    body.signature-open { overflow: hidden; }
+
+    .mobile-editor { display: none; }
+
+    .mobile-card {
+      margin-bottom: 12px;
+      overflow: hidden;
+      border: 1px solid #d8dadd;
+      border-radius: 13px;
+      background: #fff;
+      box-shadow: 0 2px 9px rgba(0, 0, 0, .06);
+    }
+
+    .mobile-editor-head { padding: 6px 3px 14px; }
+    .mobile-editor-head h1 { margin: 0 0 4px; color: #17191b; font-size: 21px; line-height: 1.25; }
+    .mobile-editor-head p { margin: 0; color: #697077; font-size: 12px; }
+    .mobile-section-label { margin: 4px 0 5px; color: #4c5156; font-size: 12px; font-weight: 700; }
+
+    .mobile-card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0;
+      padding: 12px 14px;
+      border-bottom: 1px solid #eceef0;
+      color: #202124;
+      font-size: 16px;
+    }
+
+    .mobile-card-body { padding: 12px; }
+    .mobile-field { display: block; margin-bottom: 11px; }
+    .mobile-field:last-child { margin-bottom: 0; }
+    .mobile-field > span { display: block; margin: 0 0 5px; color: #4c5156; font-size: 12px; font-weight: 600; }
+
+    .mobile-control-wrap { position: relative; display: flex; min-width: 0; }
+
+    .mobile-control {
+      width: 100%;
+      min-width: 0;
+      min-height: 44px;
+      border: 1px solid #b9bec4;
+      border-radius: 8px;
+      padding: 9px 11px;
+      color: #17191b;
+      background: #fff;
+      font: 16px/1.35 -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+      outline: none;
+      touch-action: manipulation;
+    }
+
+    textarea.mobile-control { min-height: 190px; resize: vertical; }
+    .mobile-control:focus { border-color: var(--ui-red); box-shadow: 0 0 0 2px rgba(201, 29, 35, .12); }
+    .mobile-control[readonly] { color: #555b61; background: #f3f4f5; }
+    .mobile-control.has-dropdown { padding-right: 48px; }
+
+    .mobile-dropdown-toggle {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      bottom: 1px;
+      width: 44px;
+      border: 0;
+      border-left: 1px solid #d4d7da;
+      border-radius: 0 7px 7px 0;
+      color: #34383c;
+      background: #f5f6f7;
+      font-size: 18px;
+    }
+
+    .mobile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 10px; }
+    .mobile-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .mobile-action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 11px; }
+    .mobile-action-row button,
+    .mobile-week-actions button,
+    .mobile-signature-button {
+      min-height: 40px;
+      border: 1px solid #b7bbc0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #292d31;
+      background: #f7f8f9;
+      font: 600 14px/1.2 -apple-system, "Microsoft YaHei", sans-serif;
+    }
+
+    .mobile-week-actions { display: flex; gap: 7px; }
+    .mobile-week-actions button { min-height: 34px; padding: 6px 10px; }
+
+    .mobile-service-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      border-bottom: 1px solid #f0f1f2;
+      font-size: 14px;
+    }
+
+    .mobile-service-option:last-child { border-bottom: 0; }
+    .mobile-service-option input { width: 22px; height: 22px; accent-color: var(--ui-red); }
+
+    .mobile-week-row {
+      margin-bottom: 10px;
+      border: 1px solid #e0e2e5;
+      border-radius: 9px;
+      padding: 10px;
+      background: #fafafa;
+    }
+
+    .mobile-week-row:last-child { margin-bottom: 0; }
+    .mobile-week-name { margin: 0 0 8px; color: #34383c; font-size: 13px; font-weight: 700; }
+    .mobile-signature-preview { display: block; width: min(45%, 180px); height: 70px; margin: 0 auto 8px; padding: 3px; object-fit: fill; border: 1px dashed #b8bdc2; border-radius: 8px; background: #fafafa; }
+    .mobile-signature-preview[hidden] { display: none; }
+    .mobile-signature-block + .mobile-signature-block { margin-top: 13px; padding-top: 13px; border-top: 1px solid #e5e7e9; }
+
+    .mobile-global-suggestions button { padding: 11px 12px; font-size: 15px; line-height: 1.25; }
+
+    @media screen and (max-width: 900px) {
+      .toolbar {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 7px;
+        padding: 8px max(9px, env(safe-area-inset-right)) 8px max(9px, env(safe-area-inset-left));
+      }
+
+      .toolbar button { padding: 9px 12px; font-size: 13px; }
+      .mobile-editor input,
+      .mobile-editor textarea,
+      .mobile-editor select { font-size: 16px !important; }
+      #installApp { display: none !important; }
+      .toolbar-note { order: 2; flex: 1 0 100%; max-width: none; }
+      .stage { display: block; overflow: visible; padding: 10px max(9px, env(safe-area-inset-right)) 28px max(9px, env(safe-area-inset-left)); }
+      .sheet { display: none; }
+      .mobile-editor { display: block; width: 100%; max-width: 560px; margin: 0 auto; }
+
+      .mobile-global-suggestions {
+        left: max(8px, env(safe-area-inset-left)) !important;
+        right: max(8px, env(safe-area-inset-right));
+        top: auto !important;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        width: auto !important;
+        max-height: min(48vh, 420px);
+        border-radius: 13px;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, .3);
+      }
+
+      body.pdf-rendering .sheet {
+        display: block !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000;
+        box-shadow: none;
+        pointer-events: none;
+      }
+
+      body.pdf-rendering { overflow: hidden; }
+      body.pdf-rendering::after {
+        content: "正在生成 PDF…";
+        position: fixed;
+        z-index: 1100;
+        left: 50%;
+        bottom: calc(22px + env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        border-radius: 999px;
+        padding: 10px 16px;
+        color: #fff;
+        background: rgba(32, 33, 36, .92);
+        font: 600 15px/1.2 -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, .25);
+        white-space: nowrap;
+      }
+      body.pdf-rendering .cell-action,
+      body.pdf-rendering .signature-launch { display: none !important; }
+      body.pdf-rendering input.field,
+      body.pdf-rendering select.field,
+      body.pdf-rendering textarea.field,
+      body.pdf-rendering .signature-entry input {
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      body.pdf-rendering .customer-signature-entry { border-color: transparent !important; background: transparent !important; }
+      body.pdf-rendering .report-table tr,
+      body.pdf-rendering .report-table td[rowspan] { overflow: visible !important; }
+      body.pdf-rendering .signature-date-line input { color: transparent !important; caret-color: transparent !important; }
+      body.pdf-rendering .signature-date-line::after {
+        content: attr(data-pdf-date);
+        z-index: 2;
+        grid-column: 2;
+        grid-row: 1;
+        align-self: center;
+        padding-left: .65mm;
+        color: #000;
+        font: 8.2pt/1.1 Arial, "Microsoft YaHei", sans-serif;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      .signature-pad-modal { padding: 0; }
+      .signature-pad-card {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0;
+      }
+
+      .signature-pad-head { padding-top: calc(11px + env(safe-area-inset-top)); }
+      .signature-pad-actions { flex-wrap: wrap; padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right)); }
+      .pen-status { flex: 1 0 100%; text-align: center; }
+      .signature-pad-actions button { flex: 1 1 0; padding-inline: 8px; }
+    }
+
+    @media print {
+      @page { size: A4 portrait; margin: 0; }
+
+      html, body {
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .toolbar,
+      .location-panel,
+      .compact-suggestions,
+      .mobile-editor,
+      .pdf-ready-panel,
+      .cell-action,
+      .signature-pad-modal,
+      .signature-launch { display: none !important; }
+
+      .stage { display: block; padding: 0; }
+
+      .sheet {
+        width: 210mm;
+        height: 297mm;
+        box-shadow: none;
+      }
+
+      table.report-table {
+        border-collapse: collapse !important;
+        border: .75mm solid #000 !important;
+      }
+
+      .report-table td {
+        border: .60mm solid #000 !important;
+        background: #fff !important;
+      }
+
+      input.field,
+      select.field,
+      textarea.field,
+      .signature-entry input {
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+
+      select.field { appearance: none; }
+      input::placeholder, textarea::placeholder { color: transparent !important; }
+      .customer-signature-entry { border-color: transparent !important; background: transparent !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar" role="toolbar" aria-label="报告工具栏">
+    <button type="button" id="exportPdf">导出为 PDF</button>
+    <button class="secondary" type="button" id="addWeekRow">添加星期行</button>
+    <button class="secondary" type="button" id="removeWeekRow">删除星期行</button>
+    <button class="secondary" type="button" id="installApp">安装应用</button>
+    <button class="secondary" type="button" id="exportBackup">导出备份</button>
+    <button class="secondary" type="button" id="importBackup">导入备份</button>
+    <button class="secondary" type="button" id="clearLocalData">清除本机数据</button>
+    <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V17</span>
+    <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
+  </div>
+
+  <main class="stage">
+    <section class="mobile-editor" id="mobileEditor" aria-label="手机版售后服务报告填写界面"></section>
+    <section class="sheet" id="reportPage" aria-label="售后服务工作时间表/报告">
+      <img class="header-image" src="assets/industrial-header.png" alt="售后服务工作时间表及乐嘉文工业技术（上海）有限公司页眉">
+
+      <div class="table-wrap">
+        <table class="report-table">
+          <colgroup><col><col><col><col><col><col><col><col><col></colgroup>
+          <tbody>
+            <tr class="r1">
+              <td class="label" colspan="3">公司名称 Company Name</td>
+              <td class="field-cell" colspan="6">
+                <input class="field with-action" id="companyName" name="company_name" autocomplete="organization" aria-label="公司名称">
+                <button class="cell-action" type="button" id="nearbyCompany">附近公司</button>
+              </td>
+            </tr>
+            <tr class="r2">
+              <td class="label" colspan="3">公司地点 Company Address</td>
+              <td class="field-cell" colspan="6">
+                <input class="field with-action" id="companyAddress" name="company_address" autocomplete="street-address" aria-label="公司地址">
+                <button class="cell-action" type="button" id="locateAddress">定位</button>
+              </td>
+            </tr>
+            <tr class="r3">
+              <td class="center" rowspan="2"><div class="stacked"><span>客户联系人</span><span>Contact Person</span></div></td>
+              <td class="field-cell" colspan="4"><div class="inline-field"><span class="field-prefix">姓名 Name：</span><input class="field" name="contact_name" list="contactNAOptions" aria-label="联系人姓名" autocomplete="off"><datalist id="contactNAOptions"><option value="N/A"></option></datalist></div></td>
+              <td class="field-cell" colspan="4"><div class="inline-field"><span class="field-prefix">电子邮箱 Email：</span><input class="field" name="contact_email" list="contactNAOptions" aria-label="联系人电子邮箱" autocomplete="off"></div></td>
+            </tr>
+            <tr class="r4">
+              <td class="field-cell" colspan="4"><div class="inline-field"><span class="field-prefix">电话 TEL：</span><input class="field" name="contact_phone" list="contactNAOptions" aria-label="联系人电话" autocomplete="off"></div></td>
+              <td class="field-cell" colspan="4"><div class="inline-field"><span class="field-prefix">职位 Title：</span><input class="field" name="contact_title" list="contactTitleOptions" aria-label="联系人职位" autocomplete="off"><datalist id="contactTitleOptions"><option value="工程师"></option><option value="经理"></option><option value="主管"></option><option value="主任"></option><option value="N/A"></option></datalist></div></td>
+            </tr>
+            <tr class="r5">
+              <td class="center"><div class="stacked"><span>合 同 号</span><span>Order Number</span></div></td>
+              <td class="field-cell" colspan="4"><input class="field" name="order_number" aria-label="合同号"></td>
+              <td class="center compact-label" colspan="2"><div class="stacked"><span>设备生产厂商</span><span>Supplier</span></div></td>
+              <td class="field-cell" colspan="2">
+                <input class="field with-action" id="supplierInput" name="supplier" aria-label="设备生产厂商" aria-controls="supplierSuggestions" aria-expanded="false" autocomplete="off">
+                <button class="cell-action" type="button" id="supplierDropdown">选择</button>
+                <datalist id="supplierOptions" hidden>
+                  <option value="B+S"></option><option value="SKAN"></option><option value="HH"></option>
+                  <option value="OPTIMAGS"></option><option value="KORSCH"></option><option value="DELAMA"></option>
+                  <option value="Glatt"></option><option value="ERWEKA"></option><option value="Tema"></option>
+                  <option value="SEPHA"></option><option value="ROTZINGER"></option>
+                </datalist>
+              </td>
+            </tr>
+            <tr class="r6">
+              <td class="center inline-label">工程师 Engineer</td>
+              <td class="field-cell" colspan="2"><input class="field" name="engineer_1" list="engineerOptions" aria-label="工程师一" autocomplete="off">
+                <datalist id="engineerOptions">
+                  <option value="Oliver Chen"></option><option value="Yun Pan"></option><option value="Tom Tang"></option>
+                  <option value="Denise Jiang"></option><option value="Cala Zhang"></option><option value="Neke Zhou"></option>
+                  <option value="Richard Shi"></option><option value="Bob Zhao"></option><option value="Leo Zhu"></option>
+                  <option value="Vic Shi"></option><option value="Ethan Xu"></option><option value="Lance Zhu"></option>
+                  <option value="John Wang"></option><option value="Sunny Yang"></option><option value="Flank Zhang"></option>
+                </datalist>
+              </td>
+              <td class="center inline-label" colspan="2">工程师 Engineer</td>
+              <td class="field-cell" colspan="2"><input class="field" name="engineer_2" list="engineerOptions" aria-label="工程师二" autocomplete="off"></td>
+              <td colspan="2" rowspan="4">
+                <div class="service-options" aria-label="服务类型">
+                  <label><input type="checkbox" name="service_type" value="设备就位">设备就位 Positioning</label>
+                  <label><input type="checkbox" name="service_type" value="设备安装">设备安装 Installation</label>
+                  <label><input type="checkbox" name="service_type" value="设备调试">设备调试 Commissioning</label>
+                  <label><input type="checkbox" name="service_type" value="设备维护培训">设备维护培训 Training</label>
+                  <label><input type="checkbox" name="service_type" value="故障排除">故障排除 Trouble shooting</label>
+                  <label><input type="checkbox" name="service_type" value="其他">其 它 Other</label>
+                </div>
+              </td>
+            </tr>
+            <tr class="r7">
+              <td class="label reference-label" colspan="3" rowspan="2">设备型号 Machine Type</td>
+              <td class="field-cell lined-field" colspan="4" rowspan="2">
+                <input class="field with-action" id="machineTypeInput" name="machine_type" list="contactNAOptions" aria-label="设备型号" aria-controls="naSuggestions" aria-expanded="false" autocomplete="off">
+                <button class="cell-action" type="button" id="machineTypeDropdown">选择</button>
+              </td>
+            </tr>
+            <tr class="r8"></tr>
+            <tr class="r9">
+              <td class="label reference-label" colspan="3">设备编号 Serial No.</td>
+              <td class="field-cell lined-field" colspan="4">
+                <input class="field with-action" id="serialNumberInput" name="serial_number" list="contactNAOptions" aria-label="设备编号" aria-controls="naSuggestions" aria-expanded="false" autocomplete="off">
+                <button class="cell-action" type="button" id="serialNumberDropdown">选择</button>
+              </td>
+            </tr>
+            <tr class="r10">
+              <td class="center" colspan="3"><div class="stacked"><span>起止纪录</span><span>Travel Record</span></div></td>
+              <td class="center compact-label" colspan="2"><div class="stacked"><span>出发地点</span><span>From</span></div></td>
+              <td class="center compact-label" colspan="2"><div class="stacked"><span>到达地点</span><span>To</span></div></td>
+              <td class="center compact-label"><div class="stacked"><span>日期</span><span>Date</span></div></td>
+              <td class="center compact-label"><div class="stacked"><span>时间</span><span>Time</span></div></td>
+            </tr>
+            <tr class="r11">
+              <td class="label" colspan="3">去程 Departure</td>
+              <td class="field-cell" colspan="2"><input class="field" name="departure_from" list="travelLocationOptions" aria-label="去程出发地点" autocomplete="off">
+                <datalist id="travelLocationOptions">
+                  <option value="上海"></option><option value="苏州"></option><option value="泰州"></option><option value="杭州"></option>
+                  <option value="宜昌"></option><option value="武汉"></option><option value="广州"></option><option value="北京"></option>
+                  <option value="深圳"></option><option value="常州"></option><option value="扬州"></option><option value="南通"></option><option value="合肥"></option>
+                </datalist>
+              </td>
+              <td class="field-cell" colspan="2"><input class="field" name="departure_to" list="travelLocationOptions" aria-label="去程到达地点" autocomplete="off"></td>
+              <td class="field-cell"><input class="field date-input" name="departure_date" list="dateOptions" aria-label="去程日期" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="departure_time" list="timeOptions" aria-label="去程时间" autocomplete="off"></td>
+            </tr>
+            <tr class="r12">
+              <td class="label" colspan="3">回程 Return</td>
+              <td class="field-cell" colspan="2"><input class="field" name="return_from" list="travelLocationOptions" aria-label="回程出发地点" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field" name="return_to" list="travelLocationOptions" aria-label="回程到达地点" autocomplete="off"></td>
+              <td class="field-cell"><input class="field date-input" name="return_date" list="dateOptions" aria-label="回程日期" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="return_time" list="timeOptions" aria-label="回程时间" autocomplete="off"></td>
+            </tr>
+            <tr class="r13">
+              <td class="center" colspan="3"><div class="stacked"><span>星 期</span><span>Week</span></div></td>
+              <td class="center compact-label" colspan="2"><div class="stacked"><span>日 期</span><span>Date</span></div></td>
+              <td class="center compact-label" colspan="2"><div class="stacked"><span>开始时间</span><span>Start Time</span></div></td>
+              <td class="center compact-label"><div class="stacked"><span>结束时间</span><span>End Time</span></div></td>
+              <td class="center compact-label"><div class="stacked"><span>客户签字确认</span><span class="signature-header-small">Customer Signature</span><span class="signature-header-small">(if necessary)</span></div></td>
+            </tr>
+            <tr class="daily">
+              <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_1" readonly aria-label="星期一行"></td>
+              <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_1" data-weekday="weekday_1" list="dateOptions" aria-label="工作日期一" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_1" list="timeOptions" aria-label="开始时间一" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_1" list="timeOptions" aria-label="结束时间一" autocomplete="off"></td>
+              <td class="field-cell"><input class="field" name="confirmation_1" aria-label="客户签字确认一"></td>
+            </tr>
+            <tr class="daily">
+              <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_2" readonly aria-label="星期二行"></td>
+              <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_2" data-weekday="weekday_2" list="dateOptions" aria-label="工作日期二" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_2" list="timeOptions" aria-label="开始时间二" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_2" list="timeOptions" aria-label="结束时间二" autocomplete="off"></td>
+              <td class="field-cell"><input class="field" name="confirmation_2" aria-label="客户签字确认二"></td>
+            </tr>
+            <tr class="daily">
+              <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_3" readonly aria-label="星期三行"></td>
+              <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_3" data-weekday="weekday_3" list="dateOptions" aria-label="工作日期三" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_3" list="timeOptions" aria-label="开始时间三" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_3" list="timeOptions" aria-label="结束时间三" autocomplete="off"></td>
+              <td class="field-cell"><input class="field" name="confirmation_3" aria-label="客户签字确认三"></td>
+            </tr>
+            <tr class="daily">
+              <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_4" readonly aria-label="星期四行"></td>
+              <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_4" data-weekday="weekday_4" list="dateOptions" aria-label="工作日期四" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_4" list="timeOptions" aria-label="开始时间四" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_4" list="timeOptions" aria-label="结束时间四" autocomplete="off"></td>
+              <td class="field-cell"><input class="field" name="confirmation_4" aria-label="客户签字确认四"></td>
+            </tr>
+            <tr class="daily">
+              <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_5" readonly aria-label="星期五行"></td>
+              <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_5" data-weekday="weekday_5" list="dateOptions" aria-label="工作日期五" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_5" list="timeOptions" aria-label="开始时间五" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_5" list="timeOptions" aria-label="结束时间五" autocomplete="off"></td>
+              <td class="field-cell"><input class="field" name="confirmation_5" aria-label="客户签字确认五"></td>
+            </tr>
+            <tr class="daily">
+              <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_6" readonly aria-label="星期六行"></td>
+              <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_6" data-weekday="weekday_6" list="dateOptions" aria-label="工作日期六" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_6" list="timeOptions" aria-label="开始时间六" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_6" list="timeOptions" aria-label="结束时间六" autocomplete="off"></td>
+              <td class="field-cell"><input class="field" name="confirmation_6" aria-label="客户签字确认六"></td>
+            </tr>
+            <tr class="r20" id="serviceDetailsRow">
+              <td class="notes-cell" colspan="9"><textarea class="field notes-field" name="service_details" aria-label="服务工作内容" placeholder="服务工作内容 / Service details"></textarea></td>
+            </tr>
+            <tr class="r21">
+              <td class="signature-cell" colspan="9">
+                <div class="signature-grid">
+                  <section class="signature-party">
+                    <div class="party-name">客户 Customer</div>
+                    <div class="signature-entry customer-signature-entry" id="customerSignatureEntry" role="button" tabindex="0" aria-label="打开客户手写签字板">
+                      <button class="signature-launch" id="customerSignatureLaunch" type="button">点击手写签字 / Tap to sign</button>
+                      <img class="captured-signature" id="customerSignatureImage" alt="客户手写签字" hidden>
+                      <input type="hidden" id="customerSignatureData" name="customer_signature">
+                    </div>
+                    <div class="signature-label">签字 Signature</div>
+                    <div class="signature-date-line"><span>日期 Date：</span><input class="field date-input" name="customer_signature_date" list="dateOptions" aria-label="客户签字日期" autocomplete="off"></div>
+                  </section>
+                  <section class="signature-party">
+                    <div class="party-name">乐嘉文制药科技有限公司</div>
+                    <div class="signature-entry customer-signature-entry" id="companySignatureEntry" role="button" tabindex="0" aria-label="打开公司手写签字板">
+                      <button class="signature-launch" id="companySignatureLaunch" type="button">点击手写签字 / Tap to sign</button>
+                      <img class="captured-signature" id="companySignatureImage" alt="公司手写签字" hidden>
+                      <input type="hidden" id="companySignatureData" name="company_signature">
+                    </div>
+                    <div class="signature-label">签字 Signature</div>
+                    <div class="signature-date-line"><span>日期 Date：</span><input class="field date-input" name="company_signature_date" list="dateOptions" aria-label="公司签字日期" autocomplete="off"></div>
+                  </section>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="office-footer" aria-label="办事处联系方式">
+        <img src="assets/customer-care-footer.png" alt="客户服务部及各办事处联系方式">
+      </footer>
+      <div class="page-number">Page 1/1</div>
+    </section>
+  </main>
+
+  <aside class="location-panel" id="locationPanel" hidden aria-live="polite">
+    <div class="panel-head"><strong>免 Key 附近公司搜索</strong><button type="button" id="closeNearby" aria-label="关闭">×</button></div>
+    <div class="nearby-list" id="nearbyList"><div class="panel-message">正在识别城市和区县…</div></div>
+  </aside>
+
+  <aside class="location-panel" id="installPanel" hidden aria-live="polite">
+    <div class="panel-head"><strong>安装到 iPhone 主屏幕</strong><button type="button" id="closeInstall" aria-label="关闭">×</button></div>
+    <div class="install-content">
+      <p>iPhone 请使用 Safari 打开此页面，然后：</p>
+      <ol><li>点击浏览器底部的“分享”按钮。</li><li>选择“添加到主屏幕”。</li><li>点击“添加”，以后可像 App 一样全屏使用。</li></ol>
+      <p>安装与离线功能需要通过 HTTPS 网站或本机测试服务器打开，直接双击 HTML 文件仍可填写和签字，但不能安装。</p>
+    </div>
+  </aside>
+
+  <div class="pdf-ready-panel" id="pdfReadyPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pdfReadyTitle">
+    <section class="pdf-ready-card">
+      <h2 id="pdfReadyTitle">PDF 已生成</h2>
+      <p id="pdfReadyMessage">请选择分享、打开或下载 PDF。</p>
+      <div class="pdf-ready-actions">
+        <button class="primary" type="button" id="shareGeneratedPdf">分享/发送 PDF</button>
+        <button type="button" id="openGeneratedPdf">打开 PDF</button>
+        <button type="button" id="downloadGeneratedPdf">下载 PDF</button>
+        <button type="button" id="closePdfReady">关闭</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="signature-pad-modal" id="signaturePadModal" hidden role="dialog" aria-modal="true" aria-labelledby="signaturePadTitle">
+    <section class="signature-pad-card">
+      <header class="signature-pad-head">
+        <h2 id="signaturePadTitle">客户手写签字 <span>Customer signature</span></h2>
+        <button class="signature-pad-close" id="closeSignaturePad" type="button" aria-label="关闭签字板">×</button>
+      </header>
+      <div class="signature-canvas-wrap" id="signatureCanvasWrap"><canvas id="signatureCanvas" aria-label="客户手写签字画布"></canvas></div>
+      <div class="signature-pad-actions">
+        <span class="pen-status" id="penStatus">支持手写笔、触控和鼠标；压感笔会自动调节线条粗细</span>
+        <button type="button" id="clearSignature">清除</button>
+        <button type="button" id="cancelSignature">取消</button>
+        <button class="primary" type="button" id="saveSignature">保存签字</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="compact-suggestions" id="supplierSuggestions" hidden role="listbox" aria-label="设备生产厂商选项"></div>
+  <div class="compact-suggestions" id="naSuggestions" hidden role="listbox" aria-label="N/A 选项"><button type="button" role="option">N/A</button></div>
+  <div class="compact-suggestions mobile-global-suggestions" id="globalSuggestions" hidden role="listbox" aria-label="当前字段选项"></div>
+  <datalist id="dateOptions"></datalist>
+  <datalist id="timeOptions"></datalist>
+
+  <script src="assets/html2canvas.min.js"></script>
+  <script src="assets/jspdf.umd.min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const dateOptionsList = document.getElementById('dateOptions');
+      const timeOptionsList = document.getElementById('timeOptions');
+      const reportPage = document.getElementById('reportPage');
+      const mobileEditor = document.getElementById('mobileEditor');
+      const globalSuggestions = document.getElementById('globalSuggestions');
+      const locationStatus = document.getElementById('locationStatus');
+      const offlineBadge = document.getElementById('offlineBadge');
+      const addressField = document.getElementById('companyAddress');
+      const companyField = document.getElementById('companyName');
+      const locationPanel = document.getElementById('locationPanel');
+      const installPanel = document.getElementById('installPanel');
+      const pdfReadyPanel = document.getElementById('pdfReadyPanel');
+      const pdfReadyMessage = document.getElementById('pdfReadyMessage');
+      const openGeneratedPdfButton = document.getElementById('openGeneratedPdf');
+      const shareGeneratedPdfButton = document.getElementById('shareGeneratedPdf');
+      const downloadGeneratedPdfButton = document.getElementById('downloadGeneratedPdf');
+      const nearbyList = document.getElementById('nearbyList');
+      const supplierInput = document.getElementById('supplierInput');
+      const supplierDropdown = document.getElementById('supplierDropdown');
+      const supplierSuggestions = document.getElementById('supplierSuggestions');
+      const machineTypeInput = document.getElementById('machineTypeInput');
+      const machineTypeDropdown = document.getElementById('machineTypeDropdown');
+      const serialNumberInput = document.getElementById('serialNumberInput');
+      const serialNumberDropdown = document.getElementById('serialNumberDropdown');
+      const naSuggestions = document.getElementById('naSuggestions');
+      const customerSignatureEntry = document.getElementById('customerSignatureEntry');
+      const customerSignatureLaunch = document.getElementById('customerSignatureLaunch');
+      const customerSignatureImage = document.getElementById('customerSignatureImage');
+      const customerSignatureData = document.getElementById('customerSignatureData');
+      const companySignatureEntry = document.getElementById('companySignatureEntry');
+      const companySignatureLaunch = document.getElementById('companySignatureLaunch');
+      const companySignatureImage = document.getElementById('companySignatureImage');
+      const companySignatureData = document.getElementById('companySignatureData');
+      const signaturePadModal = document.getElementById('signaturePadModal');
+      const signaturePadTitle = document.getElementById('signaturePadTitle');
+      const signatureCanvasWrap = document.getElementById('signatureCanvasWrap');
+      const signatureCanvas = document.getElementById('signatureCanvas');
+      const signatureContext = signatureCanvas.getContext('2d', { willReadFrequently: true });
+      const penStatus = document.getElementById('penStatus');
+      let cachedLocation = null;
+      let jsonpSerial = 0;
+      let nextDailyRowId = 7;
+      let activeNaInput = null;
+      let activeNaButton = null;
+      let deferredInstallPrompt = null;
+      let signatureDrawing = false;
+      let signatureHasInk = false;
+      let signatureLastPoint = null;
+      let restoringLocalState = false;
+      let localSaveTimer = null;
+      let activeGlobalInput = null;
+      let activeSignatureParty = 'customer';
+      let latestGeneratedPdf = null;
+
+      const DEFAULT_DAILY_ROWS = 6;
+      const MIN_DAILY_ROWS = 1;
+      const MAX_DAILY_ROWS = 10;
+      const DAILY_ROW_HEIGHT_MM = 6.58;
+      const DEFAULT_NOTES_HEIGHT_MM = 36.66;
+      const STORAGE_KEY = 'rieckermann-service-report-private-offline-v1';
+      const BACKUP_KIND = 'rieckermann-service-report-backup';
+
+      const pad = number => String(number).padStart(2, '0');
+      const isoDate = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+      function fillDateOptions() {
+        dateOptionsList.replaceChildren();
+        const today = new Date();
+        today.setHours(12, 0, 0, 0);
+        for (let offset = -10; offset <= 10; offset += 1) {
+          const date = new Date(today);
+          date.setDate(today.getDate() + offset);
+          const value = isoDate(date);
+          dateOptionsList.append(new Option(value, value));
+        }
+      }
+
+      function fillTimeOptions() {
+        timeOptionsList.replaceChildren();
+        for (let minutes = 5 * 60; minutes <= 24 * 60; minutes += 30) {
+          const value = `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+          timeOptionsList.append(new Option(value, value));
+        }
+      }
+
+      const isMobileLayout = () => window.matchMedia('(max-width: 900px)').matches;
+      const reportFields = name => [...reportPage.querySelectorAll('[name]')].filter(element => element.name === name);
+      const reportField = name => reportFields(name)[0] || null;
+
+      function signatureConfig(party = activeSignatureParty) {
+        return party === 'company'
+          ? { party: 'company', label: '公司', english: 'Company', entry: companySignatureEntry, launch: companySignatureLaunch, image: companySignatureImage, data: companySignatureData }
+          : { party: 'customer', label: '客户', english: 'Customer', entry: customerSignatureEntry, launch: customerSignatureLaunch, image: customerSignatureImage, data: customerSignatureData };
+      }
+
+      function mobileElement(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+      }
+
+      function pushMobileValue(input, source) {
+        source.value = input.value;
+        source.dispatchEvent(new Event('input', { bubbles: true }));
+        source.dispatchEvent(new Event('change', { bubbles: true }));
+        if (source.dataset.weekday) {
+          const weekdaySource = reportField(source.dataset.weekday);
+          [...mobileEditor.querySelectorAll('[data-source-name]')]
+            .filter(control => control.dataset.sourceName === source.dataset.weekday)
+            .forEach(control => { control.value = weekdaySource?.value || ''; });
+        }
+      }
+
+      function createMobileField(labelText, name, options = {}) {
+        const source = options.source || reportField(name);
+        if (!source) return null;
+        const label = mobileElement('label', 'mobile-field');
+        label.append(mobileElement('span', '', labelText));
+        const wrap = mobileElement('div', 'mobile-control-wrap');
+        const input = document.createElement(options.textarea ? 'textarea' : 'input');
+        input.className = 'mobile-control';
+        input.dataset.sourceName = name;
+        input.value = source.value || '';
+        input.readOnly = Boolean(options.readOnly || source.readOnly);
+        input.autocomplete = 'off';
+        input.setAttribute('aria-label', labelText);
+        if (options.textarea) input.rows = 6;
+        const listId = options.list || source.getAttribute('list');
+        if (listId) {
+          input.dataset.listId = listId;
+          input.classList.add('has-dropdown');
+        }
+        input.addEventListener('input', () => pushMobileValue(input, source));
+        input.addEventListener('change', () => pushMobileValue(input, source));
+        wrap.append(input);
+        if (listId) {
+          const button = mobileElement('button', 'mobile-dropdown-toggle', '⌄');
+          button.type = 'button';
+          button.setAttribute('aria-label', `打开${labelText}选项`);
+          button.addEventListener('pointerdown', event => event.preventDefault());
+          button.addEventListener('click', () => openGlobalSuggestions(input, { showAll: true }));
+          wrap.append(button);
+        }
+        label.append(wrap);
+        return label;
+      }
+
+      function createMobileCard(titleText) {
+        const card = mobileElement('section', 'mobile-card');
+        const title = mobileElement('h2', 'mobile-card-title', titleText);
+        const body = mobileElement('div', 'mobile-card-body');
+        card.append(title, body);
+        return { card, title, body };
+      }
+
+      function appendMobileFields(parent, fields) {
+        fields.filter(Boolean).forEach(field => parent.append(field));
+      }
+
+      function createMobileAction(text, originalId) {
+        const button = mobileElement('button', '', text);
+        button.type = 'button';
+        button.addEventListener('click', () => document.getElementById(originalId)?.click());
+        return button;
+      }
+
+      function syncMobileControlsFromReport() {
+        mobileEditor.querySelectorAll('[data-source-name]').forEach(control => {
+          const source = reportField(control.dataset.sourceName);
+          if (source && document.activeElement !== control) control.value = source.value || '';
+        });
+        [['customer', 'mobileCustomerSignaturePreview'], ['company', 'mobileCompanySignaturePreview']].forEach(([party, previewId]) => {
+          const config = signatureConfig(party);
+          const preview = mobileEditor.querySelector(`#${previewId}`);
+          if (!preview) return;
+          const hasSignature = config.data.value.startsWith('data:image/');
+          preview.hidden = !hasSignature;
+          if (hasSignature) preview.src = config.data.value;
+          else preview.removeAttribute('src');
+        });
+      }
+
+      function renderMobileEditor() {
+        mobileEditor.replaceChildren();
+        const heading = mobileElement('header', 'mobile-editor-head');
+        heading.append(
+          mobileElement('h1', '', '售后服务工作时间表/报告'),
+          mobileElement('p', '', '手机版填写界面 · 导出时自动恢复单页 A4 版式')
+        );
+        mobileEditor.append(heading);
+
+        const customer = createMobileCard('客户信息 / Customer');
+        const customerActions = mobileElement('div', 'mobile-action-row');
+        customerActions.append(createMobileAction('附近公司', 'nearbyCompany'), createMobileAction('定位城市/区县', 'locateAddress'));
+        customer.body.append(customerActions);
+        appendMobileFields(customer.body, [
+          createMobileField('公司名称 Company Name', 'company_name'),
+          createMobileField('公司地点 Company Address', 'company_address'),
+          createMobileField('联系人姓名 Name', 'contact_name', { list: 'contactNAOptions' }),
+          createMobileField('电子邮箱 Email', 'contact_email', { list: 'contactNAOptions' }),
+          createMobileField('电话 TEL', 'contact_phone', { list: 'contactNAOptions' }),
+          createMobileField('职位 Title', 'contact_title', { list: 'contactTitleOptions' })
+        ]);
+        mobileEditor.append(customer.card);
+
+        const equipment = createMobileCard('设备与服务 / Equipment & Service');
+        appendMobileFields(equipment.body, [
+          createMobileField('合同号 Order Number', 'order_number'),
+          createMobileField('设备生产厂商 Supplier', 'supplier', { list: 'supplierOptions' }),
+          createMobileField('工程师 Engineer 1', 'engineer_1', { list: 'engineerOptions' }),
+          createMobileField('工程师 Engineer 2', 'engineer_2', { list: 'engineerOptions' }),
+          createMobileField('设备型号 Machine Type', 'machine_type', { list: 'contactNAOptions' }),
+          createMobileField('设备编号 Serial No.', 'serial_number', { list: 'contactNAOptions' })
+        ]);
+        const mobileServiceOptions = mobileElement('div', 'mobile-service-list');
+        reportFields('service_type').forEach(source => {
+          const sourceLabel = source.closest('label');
+          const label = mobileElement('label', 'mobile-service-option');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = source.checked;
+          checkbox.addEventListener('change', () => {
+            source.checked = checkbox.checked;
+            source.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          label.append(checkbox, document.createTextNode(sourceLabel?.textContent.trim() || source.value));
+          mobileServiceOptions.append(label);
+        });
+        equipment.body.append(mobileElement('div', 'mobile-section-label', '服务类型 Service Type'), mobileServiceOptions);
+        mobileEditor.append(equipment.card);
+
+        const travel = createMobileCard('起止记录 / Travel Record');
+        appendMobileFields(travel.body, [
+          createMobileField('去程出发地点 Departure From', 'departure_from', { list: 'travelLocationOptions' }),
+          createMobileField('去程到达地点 Departure To', 'departure_to', { list: 'travelLocationOptions' }),
+          createMobileField('去程日期 Departure Date', 'departure_date', { list: 'dateOptions' }),
+          createMobileField('去程时间 Departure Time', 'departure_time', { list: 'timeOptions' }),
+          createMobileField('回程出发地点 Return From', 'return_from', { list: 'travelLocationOptions' }),
+          createMobileField('回程到达地点 Return To', 'return_to', { list: 'travelLocationOptions' }),
+          createMobileField('回程日期 Return Date', 'return_date', { list: 'dateOptions' }),
+          createMobileField('回程时间 Return Time', 'return_time', { list: 'timeOptions' })
+        ]);
+        mobileEditor.append(travel.card);
+
+        const weeks = createMobileCard('工作时间 / Working Time');
+        const weekActions = mobileElement('div', 'mobile-week-actions');
+        const addButton = mobileElement('button', '', '添加行');
+        const removeButton = mobileElement('button', '', '删除行');
+        addButton.type = removeButton.type = 'button';
+        addButton.addEventListener('click', addDailyRow);
+        removeButton.addEventListener('click', removeDailyRow);
+        weekActions.append(addButton, removeButton);
+        weeks.title.append(weekActions);
+        dailyRowIds().forEach((id, index) => {
+          const row = mobileElement('section', 'mobile-week-row');
+          row.append(mobileElement('div', 'mobile-week-name', `第 ${index + 1} 行 / Row ${index + 1}`));
+          appendMobileFields(row, [
+            createMobileField('星期 Week', `weekday_${id}`, { readOnly: true }),
+            createMobileField('日期 Date', `work_date_${id}`, { list: 'dateOptions' }),
+            createMobileField('开始时间 Start Time', `start_time_${id}`, { list: 'timeOptions' }),
+            createMobileField('结束时间 End Time', `end_time_${id}`, { list: 'timeOptions' }),
+            createMobileField('客户签字确认 Customer Signature', `confirmation_${id}`)
+          ]);
+          weeks.body.append(row);
+        });
+        mobileEditor.append(weeks.card);
+
+        const details = createMobileCard('服务工作内容 / Service Details');
+        appendMobileFields(details.body, [createMobileField('服务工作内容', 'service_details', { textarea: true })]);
+        mobileEditor.append(details.card);
+
+        const signatures = createMobileCard('签字 / Signatures');
+        [['customer', '客户签字 Customer Signature', 'mobileCustomerSignaturePreview'], ['company', '公司签字 Company Signature', 'mobileCompanySignaturePreview']].forEach(([party, labelText, previewId]) => {
+          const config = signatureConfig(party);
+          const block = mobileElement('section', 'mobile-signature-block');
+          block.append(mobileElement('div', 'mobile-section-label', labelText));
+          const preview = mobileElement('img', 'mobile-signature-preview');
+          preview.id = previewId;
+          preview.alt = `${config.label}手写签字预览`;
+          const hasSignature = config.data.value.startsWith('data:image/');
+          preview.hidden = !hasSignature;
+          if (hasSignature) preview.src = config.data.value;
+          const signButton = mobileElement('button', 'mobile-signature-button', hasSignature ? `重新录入${config.label}签字` : `打开全屏${config.label}签字板`);
+          signButton.type = 'button';
+          signButton.addEventListener('click', () => openSignaturePad(party));
+          block.append(preview, signButton);
+          signatures.body.append(block);
+        });
+        appendMobileFields(signatures.body, [
+          createMobileField('客户签字日期 Customer Date', 'customer_signature_date', { list: 'dateOptions' }),
+          createMobileField('公司签字日期 Company Date', 'company_signature_date', { list: 'dateOptions' })
+        ]);
+        mobileEditor.append(signatures.card);
+      }
+
+      function datalistValues(input) {
+        const list = document.getElementById(input.dataset.listId || input.getAttribute('list') || '');
+        return list ? [...list.querySelectorAll('option')].map(option => option.value).filter(Boolean) : [];
+      }
+
+      function positionGlobalSuggestions() {
+        if (!activeGlobalInput || isMobileLayout()) return;
+        const rect = activeGlobalInput.getBoundingClientRect();
+        globalSuggestions.style.left = `${rect.left}px`;
+        globalSuggestions.style.top = `${rect.bottom + 2}px`;
+        globalSuggestions.style.width = `${Math.max(rect.width, 160)}px`;
+      }
+
+      function renderGlobalSuggestions({ showAll = false } = {}) {
+        if (!activeGlobalInput) return;
+        const query = showAll ? '' : activeGlobalInput.value.trim().toLocaleLowerCase();
+        const options = datalistValues(activeGlobalInput).filter(value => !query || value.toLocaleLowerCase().includes(query));
+        globalSuggestions.replaceChildren();
+        options.forEach(value => {
+          const button = mobileElement('button', '', value);
+          button.type = 'button';
+          button.role = 'option';
+          button.addEventListener('pointerdown', event => event.preventDefault());
+          button.addEventListener('click', () => {
+            const input = activeGlobalInput;
+            input.value = value;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            closeGlobalSuggestions();
+            input.blur();
+          });
+          globalSuggestions.append(button);
+        });
+        positionGlobalSuggestions();
+        globalSuggestions.hidden = options.length === 0;
+      }
+
+      function openGlobalSuggestions(input, { showAll = false } = {}) {
+        if (!input?.dataset.listId && !input?.getAttribute('list')) return;
+        activeGlobalInput = input;
+        renderGlobalSuggestions({ showAll });
+      }
+
+      function closeGlobalSuggestions() {
+        globalSuggestions.hidden = true;
+        activeGlobalInput = null;
+      }
+
+      function syncWeekday(select) {
+        const target = document.querySelector(`[name="${select.dataset.weekday}"]`);
+        if (!target) return;
+        if (!select.value) {
+          target.value = '';
+          return;
+        }
+        const weekdays = ['星期日 SUN', '星期一 MON', '星期二 TUE', '星期三 WED', '星期四 THU', '星期五 FRI', '星期六 SAT'];
+        target.value = weekdays[new Date(`${select.value}T12:00:00`).getDay()];
+      }
+
+      function bindLinkedDate(input) {
+        if (input.dataset.weekdayBound) return;
+        input.dataset.weekdayBound = 'true';
+        input.addEventListener('input', () => syncWeekday(input));
+        input.addEventListener('change', () => syncWeekday(input));
+        syncWeekday(input);
+      }
+
+      fillDateOptions();
+      fillTimeOptions();
+      document.querySelectorAll('.linked-date').forEach(bindLinkedDate);
+
+      const textValue = value => Array.isArray(value) ? String(value[0] || '') : String(value || '');
+      const distinct = values => values.map(textValue).map(value => value.trim()).filter((value, index, list) => value && list.indexOf(value) === index);
+
+      function jsonp(url, parameters = {}, timeout = 12000) {
+        return new Promise((resolve, reject) => {
+          const callback = `serviceReportJsonp_${Date.now()}_${jsonpSerial += 1}`;
+          const script = document.createElement('script');
+          const query = new URLSearchParams({ ...parameters, callback });
+          let timer;
+          const cleanup = () => {
+            clearTimeout(timer);
+            script.remove();
+            try { delete window[callback]; } catch (_) { window[callback] = undefined; }
+          };
+          window[callback] = data => { cleanup(); resolve(data); };
+          script.onerror = () => { cleanup(); reject(new Error('国内地图服务暂时无法连接')); };
+          timer = setTimeout(() => { cleanup(); reject(new Error('国内地图服务响应超时')); }, timeout);
+          script.src = `${url}${url.includes('?') ? '&' : '?'}${query.toString()}`;
+          document.head.append(script);
+        });
+      }
+
+      function displayRegion(location) {
+        const city = textValue(location.city);
+        const district = textValue(location.district);
+        const province = textValue(location.province);
+        return distinct([city || province, district]).join('');
+      }
+
+      async function locateWithPconline() {
+        const data = await jsonp('https://whois.pconline.com.cn/ipJson.jsp', { level: '3' });
+        const location = {
+          province: textValue(data?.pro), city: textValue(data?.city), district: textValue(data?.region),
+          source: '国内 IP 定位'
+        };
+        if (!displayRegion(location)) throw new Error('国内 IP 服务未返回城市信息');
+        return location;
+      }
+
+      async function resolveLocation({ force = false } = {}) {
+        if (cachedLocation && !force) return cachedLocation;
+        cachedLocation = await locateWithPconline();
+        return cachedLocation;
+      }
+
+      async function locateAddress({ quiet = false, force = false } = {}) {
+        if (!quiet) locationStatus.textContent = '正在通过国内服务识别城市和区县…';
+        try {
+          const location = await resolveLocation({ force });
+          const address = displayRegion(location);
+          if (address && (!addressField.value || !quiet)) {
+            addressField.value = address;
+            scheduleLocalSave();
+            syncMobileControlsFromReport();
+          }
+          locationStatus.textContent = `已通过${location.source}定位：${address}；内容可手动修改。`;
+          return location;
+        } catch (error) {
+          locationStatus.textContent = `定位失败：${error.message}。地址仍可手动填写。`;
+          throw error;
+        }
+      }
+
+      function renderNearbySearch(location) {
+        const region = displayRegion(location) || addressField.value.trim();
+        const city = textValue(location.city) || region;
+        const keyword = companyField.value.trim() || `${textValue(location.district)} 公司`.trim();
+        const searchUrl = new URL('https://uri.amap.com/search');
+        searchUrl.search = new URLSearchParams({
+          keyword, city, view: 'list', src: 'service-report', callnative: '0'
+        });
+        nearbyList.replaceChildren();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'nearby-entry';
+        wrapper.innerHTML = '<p></p><label for="nearbyCompanyInput">公司名称</label><input id="nearbyCompanyInput" autocomplete="organization"><label for="nearbyAddressInput">公司地址</label><input id="nearbyAddressInput" autocomplete="street-address"><a class="nearby-map-link" target="_blank" rel="noopener">打开地图搜索</a><button class="nearby-apply" type="button">填入报告</button>';
+        wrapper.querySelector('p').textContent = `当前区域：${region || '未定位'}。地图搜索无需配置 Key；在地图中确认公司后，可在下方填写并一键带入报告。`;
+        const nameInput = wrapper.querySelector('#nearbyCompanyInput');
+        const addressInput = wrapper.querySelector('#nearbyAddressInput');
+        nameInput.value = companyField.value;
+        addressInput.value = addressField.value;
+        wrapper.querySelector('.nearby-map-link').href = searchUrl.toString();
+        wrapper.querySelector('.nearby-apply').addEventListener('click', () => {
+          companyField.value = nameInput.value.trim();
+          addressField.value = addressInput.value.trim();
+          scheduleLocalSave();
+          syncMobileControlsFromReport();
+          locationPanel.hidden = true;
+          locationStatus.textContent = companyField.value ? `已填入公司：${companyField.value}` : '公司信息可继续手动填写。';
+        });
+        nearbyList.append(wrapper);
+      }
+
+      async function openNearbyCompanies() {
+        locationPanel.hidden = false;
+        nearbyList.innerHTML = '<div class="panel-message">正在识别城市和区县…</div>';
+        try {
+          const location = await resolveLocation();
+          if (!addressField.value) addressField.value = displayRegion(location);
+          renderNearbySearch(location);
+        } catch (error) {
+          renderNearbySearch({ city: addressField.value.trim(), district: '', province: '' });
+          locationStatus.textContent = `自动定位暂不可用：${error.message}；仍可免 Key 打开地图搜索。`;
+        }
+      }
+
+      function closePanels() {
+        locationPanel.hidden = true;
+        installPanel.hidden = true;
+        closeSupplierSuggestions();
+        closeNaSuggestions();
+        closeGlobalSuggestions();
+      }
+
+      function refreshDailyLayout() {
+        const count = document.querySelectorAll('tr.daily').length;
+        const notesHeight = DEFAULT_NOTES_HEIGHT_MM + (DEFAULT_DAILY_ROWS - count) * DAILY_ROW_HEIGHT_MM;
+        document.getElementById('serviceDetailsRow').style.height = `${notesHeight.toFixed(2)}mm`;
+        document.getElementById('addWeekRow').disabled = count >= MAX_DAILY_ROWS;
+        document.getElementById('removeWeekRow').disabled = count <= MIN_DAILY_ROWS;
+      }
+
+      function createDailyRow(id) {
+        const row = document.createElement('tr');
+        row.className = 'daily';
+        row.dataset.rowId = String(id);
+        row.innerHTML = `<td class="field-cell" colspan="3"><input class="field weekday" name="weekday_${id}" readonly aria-label="星期行 ${id}"></td>
+          <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_${id}" data-weekday="weekday_${id}" list="dateOptions" aria-label="工作日期 ${id}" autocomplete="off"></td>
+          <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_${id}" list="timeOptions" aria-label="开始时间 ${id}" autocomplete="off"></td>
+          <td class="field-cell"><input class="field time-input" name="end_time_${id}" list="timeOptions" aria-label="结束时间 ${id}" autocomplete="off"></td>
+          <td class="field-cell"><input class="field" name="confirmation_${id}" aria-label="客户签字确认 ${id}"></td>`;
+        bindLinkedDate(row.querySelector('.linked-date'));
+        return row;
+      }
+
+      function addDailyRow() {
+        const count = document.querySelectorAll('tr.daily').length;
+        if (count >= MAX_DAILY_ROWS) {
+          locationStatus.textContent = `为保持一页 A4 版式，最多可保留 ${MAX_DAILY_ROWS} 个星期行。`;
+          return;
+        }
+        const row = createDailyRow(nextDailyRowId);
+        nextDailyRowId += 1;
+        document.getElementById('serviceDetailsRow').before(row);
+        refreshDailyLayout();
+        scheduleLocalSave();
+        locationStatus.textContent = `已添加星期行；当前共 ${count + 1} 行，服务工作内容区域已自动缩小。`;
+        renderMobileEditor();
+      }
+
+      function removeDailyRow() {
+        const rows = [...document.querySelectorAll('tr.daily')];
+        if (rows.length <= MIN_DAILY_ROWS) {
+          locationStatus.textContent = '至少需要保留一个星期行。';
+          return;
+        }
+        rows.at(-1).remove();
+        refreshDailyLayout();
+        scheduleLocalSave();
+        locationStatus.textContent = `已删除最后一个星期行；当前共 ${rows.length - 1} 行，服务工作内容区域已自动增高。`;
+        renderMobileEditor();
+      }
+
+      function positionSupplierSuggestions() {
+        const rect = supplierInput.getBoundingClientRect();
+        supplierSuggestions.style.left = `${rect.left}px`;
+        supplierSuggestions.style.top = `${rect.bottom + 2}px`;
+        supplierSuggestions.style.width = `${Math.max(rect.width, 150)}px`;
+      }
+
+      function renderSupplierSuggestions() {
+        const query = supplierInput.value.trim().toLocaleLowerCase();
+        const options = [...document.querySelectorAll('#supplierOptions option')]
+          .map(option => option.value)
+          .filter(value => !query || value.toLocaleLowerCase().includes(query));
+        supplierSuggestions.replaceChildren();
+        options.forEach(value => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.role = 'option';
+          button.textContent = value;
+          button.addEventListener('pointerdown', event => event.preventDefault());
+          button.addEventListener('click', () => {
+            supplierInput.value = value;
+            scheduleLocalSave();
+            supplierSuggestions.hidden = true;
+            supplierInput.setAttribute('aria-expanded', 'false');
+            supplierInput.focus();
+          });
+          supplierSuggestions.append(button);
+        });
+        positionSupplierSuggestions();
+        supplierSuggestions.hidden = options.length === 0;
+        supplierInput.setAttribute('aria-expanded', String(options.length > 0));
+      }
+
+      function closeSupplierSuggestions() {
+        supplierSuggestions.hidden = true;
+        supplierInput.setAttribute('aria-expanded', 'false');
+      }
+
+      function positionNaSuggestions() {
+        if (!activeNaInput) return;
+        const rect = activeNaInput.getBoundingClientRect();
+        naSuggestions.style.left = `${rect.left}px`;
+        naSuggestions.style.top = `${rect.bottom + 2}px`;
+        naSuggestions.style.width = `${Math.max(120, Math.min(rect.width, 220))}px`;
+      }
+
+      function closeNaSuggestions() {
+        naSuggestions.hidden = true;
+        if (activeNaInput) activeNaInput.setAttribute('aria-expanded', 'false');
+        activeNaInput = null;
+        activeNaButton = null;
+      }
+
+      function toggleNaSuggestions(input, button) {
+        if (!naSuggestions.hidden && activeNaInput === input) {
+          closeNaSuggestions();
+          return;
+        }
+        activeNaInput = input;
+        activeNaButton = button;
+        input.setAttribute('aria-expanded', 'true');
+        positionNaSuggestions();
+        naSuggestions.hidden = false;
+      }
+
+      function clearSignatureCanvas() {
+        signatureContext.save();
+        signatureContext.setTransform(1, 0, 0, 1, 0, 0);
+        signatureContext.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+        signatureContext.restore();
+        signatureHasInk = false;
+        signatureCanvasWrap.classList.remove('has-ink');
+        penStatus.textContent = '支持手写笔、触控和鼠标；压感笔会自动调节线条粗细';
+      }
+
+      function configureSignatureContext() {
+        const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+        signatureContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+        signatureContext.lineCap = 'round';
+        signatureContext.lineJoin = 'round';
+        signatureContext.strokeStyle = '#111';
+        signatureContext.fillStyle = '#111';
+      }
+
+      function drawSignatureImage(dataUrl, { contain = true } = {}) {
+        if (!dataUrl) return;
+        const image = new Image();
+        image.onload = () => {
+          const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+          const width = signatureCanvas.width / ratio;
+          const height = signatureCanvas.height / ratio;
+          const scale = contain ? Math.min((width * .88) / image.naturalWidth, (height * .78) / image.naturalHeight) : 1;
+          const drawWidth = contain ? image.naturalWidth * scale : width;
+          const drawHeight = contain ? image.naturalHeight * scale : height;
+          signatureContext.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+          signatureHasInk = true;
+          signatureCanvasWrap.classList.add('has-ink');
+        };
+        image.src = dataUrl;
+      }
+
+      function resizeSignatureCanvas({ preserve = true } = {}) {
+        if (signaturePadModal.hidden) return;
+        const preserved = preserve && signatureHasInk && signatureCanvas.width ? signatureCanvas.toDataURL('image/png') : '';
+        const rect = signatureCanvasWrap.getBoundingClientRect();
+        const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+        signatureCanvas.width = Math.max(1, Math.round(rect.width * ratio));
+        signatureCanvas.height = Math.max(1, Math.round(rect.height * ratio));
+        configureSignatureContext();
+        signatureHasInk = false;
+        signatureCanvasWrap.classList.remove('has-ink');
+        if (preserved) drawSignatureImage(preserved, { contain: false });
+      }
+
+      function openSignaturePad(party = 'customer') {
+        activeSignatureParty = party === 'company' ? 'company' : 'customer';
+        const config = signatureConfig();
+        closePanels();
+        signaturePadTitle.innerHTML = `${config.label}手写签字 <span>${config.english} signature</span>`;
+        signatureCanvas.setAttribute('aria-label', `${config.label}手写签字画布`);
+        signaturePadModal.hidden = false;
+        document.body.classList.add('signature-open');
+        requestAnimationFrame(() => {
+          resizeSignatureCanvas({ preserve: false });
+          if (config.data.value.startsWith('data:image/')) drawSignatureImage(config.data.value);
+          document.getElementById('clearSignature').focus({ preventScroll: true });
+        });
+      }
+
+      function closeSignaturePad() {
+        signatureDrawing = false;
+        signatureLastPoint = null;
+        signaturePadModal.hidden = true;
+        document.body.classList.remove('signature-open');
+        signatureConfig().entry.focus({ preventScroll: true });
+      }
+
+      function signaturePoint(event) {
+        const rect = signatureCanvas.getBoundingClientRect();
+        return {
+          x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
+          y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
+          pressure: event.pointerType === 'pen' && event.pressure > 0 ? event.pressure : .5,
+          pointerType: event.pointerType || 'mouse'
+        };
+      }
+
+      function signatureLineWidth(point) {
+        if (point.pointerType === 'pen') return 1.25 + point.pressure * 4.25;
+        if (point.pointerType === 'touch') return 3.2;
+        return 2.5;
+      }
+
+      function beginSignatureStroke(event) {
+        if (event.button !== undefined && event.button !== 0 && event.pointerType === 'mouse') return;
+        event.preventDefault();
+        signatureCanvas.setPointerCapture?.(event.pointerId);
+        signatureDrawing = true;
+        signatureLastPoint = signaturePoint(event);
+        signatureContext.beginPath();
+        signatureContext.arc(signatureLastPoint.x, signatureLastPoint.y, signatureLineWidth(signatureLastPoint) / 2, 0, Math.PI * 2);
+        signatureContext.fill();
+        signatureHasInk = true;
+        signatureCanvasWrap.classList.add('has-ink');
+        const device = event.pointerType === 'pen' ? '手写笔' : event.pointerType === 'touch' ? '触控' : '鼠标';
+        penStatus.textContent = `正在使用${device}签字`;
+      }
+
+      function continueSignatureStroke(event) {
+        if (!signatureDrawing) return;
+        event.preventDefault();
+        const samples = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
+        samples.forEach(sample => {
+          const point = signaturePoint(sample);
+          signatureContext.beginPath();
+          signatureContext.moveTo(signatureLastPoint.x, signatureLastPoint.y);
+          signatureContext.lineTo(point.x, point.y);
+          signatureContext.lineWidth = signatureLineWidth(point);
+          signatureContext.stroke();
+          signatureLastPoint = point;
+        });
+      }
+
+      function endSignatureStroke(event) {
+        if (!signatureDrawing) return;
+        event.preventDefault();
+        signatureDrawing = false;
+        signatureLastPoint = null;
+        try { signatureCanvas.releasePointerCapture?.(event.pointerId); } catch (_) {}
+        penStatus.textContent = '签字已记录，可继续补写或点击“保存签字”';
+      }
+
+      function croppedSignatureData() {
+        if (!signatureHasInk) return '';
+        const width = signatureCanvas.width;
+        const height = signatureCanvas.height;
+        const pixels = signatureContext.getImageData(0, 0, width, height).data;
+        let left = width;
+        let right = -1;
+        let top = height;
+        let bottom = -1;
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            if (pixels[(y * width + x) * 4 + 3] > 12) {
+              if (x < left) left = x;
+              if (x > right) right = x;
+              if (y < top) top = y;
+              if (y > bottom) bottom = y;
+            }
+          }
+        }
+        if (right < left || bottom < top) return '';
+        const padding = Math.round(10 * Math.max(1, Math.min(window.devicePixelRatio || 1, 3)));
+        left = Math.max(0, left - padding);
+        top = Math.max(0, top - padding);
+        right = Math.min(width - 1, right + padding);
+        bottom = Math.min(height - 1, bottom + padding);
+        const cropped = document.createElement('canvas');
+        cropped.width = right - left + 1;
+        cropped.height = bottom - top + 1;
+        cropped.getContext('2d').drawImage(signatureCanvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
+        return cropped.toDataURL('image/png');
+      }
+
+      function saveSignature() {
+        const config = signatureConfig();
+        const dataUrl = croppedSignatureData();
+        config.data.value = dataUrl;
+        if (dataUrl) {
+          config.image.src = dataUrl;
+          config.image.hidden = false;
+          config.launch.hidden = true;
+          locationStatus.textContent = `${config.label}手写签字已保存，并会自适应显示在 HTML 和导出的 PDF 中。`;
+        } else {
+          config.image.removeAttribute('src');
+          config.image.hidden = true;
+          config.launch.hidden = false;
+          locationStatus.textContent = `${config.label}手写签字已清除。`;
+        }
+        closeSignaturePad();
+        scheduleLocalSave();
+        renderMobileEditor();
+      }
+
+      function dailyRowIds() {
+        return [...document.querySelectorAll('tr.daily')].map((row, index) => {
+          const linkedDate = row.querySelector('.linked-date');
+          const match = linkedDate?.name?.match(/_(\d+)$/);
+          return match ? Number(match[1]) : index + 1;
+        });
+      }
+
+      function collectLocalState() {
+        const occurrence = new Map();
+        const fields = [...document.querySelectorAll('[name]')].map(element => {
+          const index = occurrence.get(element.name) || 0;
+          occurrence.set(element.name, index + 1);
+          return {
+            name: element.name,
+            occurrence: index,
+            type: element.type || element.tagName.toLowerCase(),
+            value: element.value,
+            checked: 'checked' in element ? element.checked : undefined
+          };
+        });
+        return {
+          kind: BACKUP_KIND,
+          version: 1,
+          savedAt: new Date().toISOString(),
+          dailyRowIds: dailyRowIds(),
+          fields
+        };
+      }
+
+      function saveLocalState({ quiet = true } = {}) {
+        if (restoringLocalState) return;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(collectLocalState()));
+          if (!quiet) locationStatus.textContent = '报告数据、客户签字和公司签字已保存在当前设备。';
+        } catch (error) {
+          locationStatus.textContent = `本机自动保存失败：${error.message}`;
+        }
+      }
+
+      function scheduleLocalSave() {
+        if (restoringLocalState) return;
+        clearTimeout(localSaveTimer);
+        localSaveTimer = setTimeout(() => saveLocalState(), 180);
+      }
+
+      function rebuildDailyRows(ids) {
+        const normalized = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter(Number.isInteger))].slice(0, MAX_DAILY_ROWS);
+        const targetIds = normalized.length ? normalized : Array.from({ length: DEFAULT_DAILY_ROWS }, (_, index) => index + 1);
+        document.querySelectorAll('tr.daily').forEach(row => row.remove());
+        targetIds.forEach(id => document.getElementById('serviceDetailsRow').before(createDailyRow(id)));
+        nextDailyRowId = Math.max(...targetIds, 0) + 1;
+        refreshDailyLayout();
+      }
+
+      function renderStoredSignatures() {
+        ['customer', 'company'].forEach(party => {
+          const config = signatureConfig(party);
+          const dataUrl = config.data.value;
+          if (dataUrl.startsWith('data:image/')) {
+            config.image.src = dataUrl;
+            config.image.hidden = false;
+            config.launch.hidden = true;
+          } else {
+            config.data.value = '';
+            config.image.removeAttribute('src');
+            config.image.hidden = true;
+            config.launch.hidden = false;
+          }
+        });
+      }
+
+      function applyLocalState(state, { imported = false } = {}) {
+        if (!state || state.kind !== BACKUP_KIND || !Array.isArray(state.fields)) throw new Error('不是有效的服务报告备份文件');
+        restoringLocalState = true;
+        try {
+          rebuildDailyRows(state.dailyRowIds);
+          const grouped = new Map();
+          document.querySelectorAll('[name]').forEach(element => {
+            if (!grouped.has(element.name)) grouped.set(element.name, []);
+            grouped.get(element.name).push(element);
+          });
+          state.fields.forEach(record => {
+            const element = grouped.get(record.name)?.[record.occurrence || 0];
+            if (!element) return;
+            if ('checked' in element && typeof record.checked === 'boolean') element.checked = record.checked;
+            if (typeof record.value === 'string') element.value = record.value;
+          });
+          document.querySelectorAll('.linked-date').forEach(syncWeekday);
+          renderStoredSignatures();
+          refreshDailyLayout();
+        } finally {
+          restoringLocalState = false;
+        }
+        saveLocalState();
+        const dateText = state.savedAt ? new Date(state.savedAt).toLocaleString('zh-CN') : '未知时间';
+        locationStatus.textContent = imported ? `备份已导入；原保存时间：${dateText}` : `已恢复当前设备上 ${dateText} 保存的报告。`;
+        renderMobileEditor();
+      }
+
+      function restoreLocalState() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) {
+          refreshDailyLayout();
+          locationStatus.textContent = 'HTTPS · PWA · OFFLINE READY：报告会自动保存在当前设备。';
+          return false;
+        }
+        try {
+          applyLocalState(JSON.parse(stored));
+          return true;
+        } catch (error) {
+          console.warn('Local report restore failed', error);
+          refreshDailyLayout();
+          locationStatus.textContent = '未能恢复旧数据；当前报告仍可正常填写。';
+          return false;
+        }
+      }
+
+      function exportLocalBackup() {
+        const state = collectLocalState();
+        saveLocalState();
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `service-report-backup-${isoDate(new Date())}.json`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        locationStatus.textContent = '本机报告备份已导出。';
+      }
+
+      async function importLocalBackup(file) {
+        if (!file) return;
+        const state = JSON.parse(await file.text());
+        applyLocalState(state, { imported: true });
+      }
+
+      function clearLocalReport() {
+        if (!confirm('确定清除这台设备上保存的报告内容、客户签字和公司签字吗？建议先导出备份。')) return;
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+
+      async function showInstallPrompt() {
+        closePanels();
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          await deferredInstallPrompt.userChoice;
+          deferredInstallPrompt = null;
+          return;
+        }
+        installPanel.hidden = false;
+      }
+
+      function openLatestGeneratedPdf() {
+        if (!latestGeneratedPdf?.pdfUrl) return;
+        window.location.assign(latestGeneratedPdf.pdfUrl);
+      }
+
+      function downloadLatestGeneratedPdf() {
+        if (!latestGeneratedPdf?.pdfUrl) return;
+        const link = document.createElement('a');
+        link.href = latestGeneratedPdf.pdfUrl;
+        link.download = latestGeneratedPdf.fileName;
+        document.body.append(link);
+        link.click();
+        link.remove();
+      }
+
+      async function shareLatestGeneratedPdf() {
+        if (!latestGeneratedPdf) return;
+        try {
+          const file = new File([latestGeneratedPdf.blob], latestGeneratedPdf.fileName, { type: 'application/pdf' });
+          await navigator.share({ files: [file], title: latestGeneratedPdf.fileName });
+          pdfReadyPanel.hidden = true;
+          locationStatus.textContent = 'PDF 已通过系统分享菜单发送或保存。';
+        } catch (error) {
+          if (error?.name !== 'AbortError') {
+            pdfReadyMessage.textContent = '系统未能直接发送此文件。请点击“打开 PDF”，再使用 PDF 页面中的分享按钮；也可点击“下载 PDF”保存到文件。';
+            locationStatus.textContent = '直接分享失败，已提供打开和下载方式。';
+          }
+        }
+      }
+
+      document.getElementById('nearbyCompany').addEventListener('click', openNearbyCompanies);
+      document.getElementById('locateAddress').addEventListener('click', () => locateAddress({ force: true }).catch(() => {}));
+      document.getElementById('closeNearby').addEventListener('click', () => { locationPanel.hidden = true; });
+      document.getElementById('closeInstall').addEventListener('click', () => { installPanel.hidden = true; });
+      document.getElementById('installApp').addEventListener('click', showInstallPrompt);
+      openGeneratedPdfButton.addEventListener('click', openLatestGeneratedPdf);
+      shareGeneratedPdfButton.addEventListener('click', shareLatestGeneratedPdf);
+      downloadGeneratedPdfButton.addEventListener('click', downloadLatestGeneratedPdf);
+      document.getElementById('closePdfReady').addEventListener('click', () => { pdfReadyPanel.hidden = true; });
+      document.getElementById('exportBackup').addEventListener('click', exportLocalBackup);
+      document.getElementById('importBackup').addEventListener('click', () => {
+        const picker = document.getElementById('importBackupFile');
+        picker.value = '';
+        picker.click();
+      });
+      document.getElementById('importBackupFile').addEventListener('change', event => {
+        importLocalBackup(event.target.files?.[0]).catch(error => {
+          locationStatus.textContent = `备份导入失败：${error.message}`;
+        });
+      });
+      document.getElementById('clearLocalData').addEventListener('click', clearLocalReport);
+      document.getElementById('addWeekRow').addEventListener('click', addDailyRow);
+      document.getElementById('removeWeekRow').addEventListener('click', removeDailyRow);
+      [['customer', customerSignatureEntry], ['company', companySignatureEntry]].forEach(([party, entry]) => {
+        entry.addEventListener('click', () => openSignaturePad(party));
+        entry.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openSignaturePad(party);
+          }
+        });
+      });
+      signatureCanvas.addEventListener('pointerdown', beginSignatureStroke);
+      signatureCanvas.addEventListener('pointermove', continueSignatureStroke);
+      signatureCanvas.addEventListener('pointerup', endSignatureStroke);
+      signatureCanvas.addEventListener('pointercancel', endSignatureStroke);
+      document.getElementById('clearSignature').addEventListener('click', clearSignatureCanvas);
+      document.getElementById('saveSignature').addEventListener('click', saveSignature);
+      document.getElementById('cancelSignature').addEventListener('click', closeSignaturePad);
+      document.getElementById('closeSignaturePad').addEventListener('click', closeSignaturePad);
+      supplierInput.addEventListener('focus', renderSupplierSuggestions);
+      supplierInput.addEventListener('input', renderSupplierSuggestions);
+      supplierDropdown.addEventListener('click', () => {
+        if (supplierSuggestions.hidden) renderSupplierSuggestions();
+        else closeSupplierSuggestions();
+      });
+      machineTypeDropdown.addEventListener('click', () => toggleNaSuggestions(machineTypeInput, machineTypeDropdown));
+      serialNumberDropdown.addEventListener('click', () => toggleNaSuggestions(serialNumberInput, serialNumberDropdown));
+      naSuggestions.querySelector('button').addEventListener('pointerdown', event => event.preventDefault());
+      naSuggestions.querySelector('button').addEventListener('click', () => {
+        if (!activeNaInput) return;
+        const target = activeNaInput;
+        target.value = 'N/A';
+        scheduleLocalSave();
+        closeNaSuggestions();
+        target.focus();
+      });
+      document.addEventListener('pointerdown', event => {
+        if (!supplierSuggestions.contains(event.target) && event.target !== supplierInput && event.target !== supplierDropdown) closeSupplierSuggestions();
+        if (!naSuggestions.contains(event.target) && event.target !== machineTypeDropdown && event.target !== serialNumberDropdown) closeNaSuggestions();
+        if (!globalSuggestions.contains(event.target) && event.target !== activeGlobalInput && !event.target.closest?.('.mobile-dropdown-toggle')) closeGlobalSuggestions();
+      });
+      document.addEventListener('focusin', event => {
+        if (isMobileLayout() && event.target.closest?.('#mobileEditor') && event.target.matches?.('input[data-list-id]')) {
+          openGlobalSuggestions(event.target, { showAll: true });
+        }
+      });
+      document.addEventListener('input', event => {
+        if (event.target.matches?.('[name]')) scheduleLocalSave();
+        if (event.target === activeGlobalInput) renderGlobalSuggestions();
+      });
+      document.addEventListener('change', event => {
+        if (event.target.matches?.('[name]')) scheduleLocalSave();
+      });
+      window.addEventListener('resize', () => { if (!supplierSuggestions.hidden) positionSupplierSuggestions(); });
+      window.addEventListener('scroll', () => { if (!supplierSuggestions.hidden) positionSupplierSuggestions(); }, true);
+      window.addEventListener('resize', () => {
+        if (!naSuggestions.hidden) positionNaSuggestions();
+        if (!globalSuggestions.hidden) positionGlobalSuggestions();
+        if (!signaturePadModal.hidden) resizeSignatureCanvas();
+      });
+      window.addEventListener('scroll', () => { if (!naSuggestions.hidden) positionNaSuggestions(); }, true);
+      window.addEventListener('scroll', () => { if (!globalSuggestions.hidden) positionGlobalSuggestions(); }, true);
+      window.addEventListener('orientationchange', () => {
+        if (!signaturePadModal.hidden) setTimeout(() => resizeSignatureCanvas(), 120);
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        if (!signaturePadModal.hidden) closeSignaturePad();
+        else closePanels();
+      });
+
+      window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        locationStatus.textContent = '此设备支持安装：点击“安装应用”即可添加到主屏幕。';
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        installPanel.hidden = true;
+        locationStatus.textContent = '应用已安装，可从主屏幕全屏打开并离线填写报告。';
+      });
+      window.addEventListener('beforeunload', () => saveLocalState());
+
+      function withTimeout(promise, milliseconds, message) {
+        let timer;
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), milliseconds); })
+        ]).finally(() => clearTimeout(timer));
+      }
+
+      async function publishGeneratedPdf(blob, fileName) {
+        const blobUrl = URL.createObjectURL(blob);
+        if (!('caches' in window) || location.protocol === 'file:') return { pdfUrl: blobUrl, blobUrl, cached: false };
+        try {
+          const cache = await caches.open('service-report-generated-pdf-v1');
+          const previous = await cache.keys();
+          await Promise.all(previous.map(request => cache.delete(request)));
+          const pdfUrl = new URL(`./generated-service-report-${Date.now()}.pdf`, location.href).href;
+          const headers = new Headers({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+            'Cache-Control': 'private, max-age=86400'
+          });
+          await cache.put(pdfUrl, new Response(blob, { status: 200, headers }));
+          return { pdfUrl, blobUrl, cached: true };
+        } catch (error) {
+          console.warn('Generated PDF cache unavailable', error);
+          return { pdfUrl: blobUrl, blobUrl, cached: false };
+        }
+      }
+
+      async function generateMobilePdf() {
+        const exportButton = document.getElementById('exportPdf');
+        const pdfDateLines = [...reportPage.querySelectorAll('.signature-date-line')];
+        const firstDate = document.querySelector('.linked-date')?.value || isoDate(new Date());
+        const fileName = `售后服务工作时间表-${firstDate}.pdf`;
+        const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        pdfReadyPanel.hidden = true;
+        exportButton.disabled = true;
+        exportButton.setAttribute('aria-busy', 'true');
+        document.title = fileName.replace(/\.pdf$/i, '');
+        locationStatus.textContent = '正在生成 PDF（1/3）：准备 A4 报告…';
+        pdfDateLines.forEach(line => { line.dataset.pdfDate = line.querySelector('input')?.value || ''; });
+        document.body.classList.add('pdf-rendering');
+        try {
+          if (typeof window.html2canvas !== 'function' || !window.jspdf?.jsPDF) {
+            throw new Error('PDF 组件未加载，请先联网打开一次本应用以完成离线缓存。');
+          }
+          if (document.fonts?.ready) {
+            await withTimeout(document.fonts.ready, 2500, '字体准备超时').catch(() => {});
+          }
+          await new Promise(resolve => setTimeout(resolve, 80));
+          locationStatus.textContent = '正在生成 PDF（2/3）：绘制报告表格…';
+          const scale = isIOS ? 1.75 : Math.min(2.2, Math.max(1.8, (window.devicePixelRatio || 2) * .75));
+          const canvas = await withTimeout(window.html2canvas(reportPage, {
+            scale,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false,
+            width: reportPage.scrollWidth,
+            height: reportPage.scrollHeight,
+            windowWidth: reportPage.scrollWidth,
+            windowHeight: reportPage.scrollHeight,
+            scrollX: 0,
+            scrollY: 0
+          }), 45000, '报告绘制超时，请关闭其他应用后重试');
+          locationStatus.textContent = '正在生成 PDF（3/3）：封装单页 A4 文件…';
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+          pdf.setProperties({
+            title: document.title,
+            subject: '售后服务工作时间表/报告',
+            creator: 'Private Offline Service Report PWA'
+          });
+          pdf.addImage(canvas.toDataURL('image/jpeg', .96), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+          const blob = pdf.output('blob');
+          window.__lastGeneratedPdfBlob = blob;
+          const { pdfUrl, blobUrl, cached } = await publishGeneratedPdf(blob, fileName);
+          window.__lastGeneratedPdfUrl = pdfUrl;
+          locationStatus.textContent = 'PDF 已生成，请选择分享、打开或下载。';
+          latestGeneratedPdf = { blob, pdfUrl, blobUrl, fileName, cached };
+          pdfReadyMessage.textContent = `文件已生成（${Math.max(1, Math.round(blob.size / 1024))} KB）。请点击“分享/发送 PDF”；如系统不支持，可打开或下载后再发送。`;
+          shareGeneratedPdfButton.hidden = typeof navigator.share !== 'function';
+          pdfReadyPanel.hidden = false;
+          window.dispatchEvent(new CustomEvent('service-report-pdf-ready', {
+            cancelable: true,
+            detail: { fileName, pdfUrl, bytes: blob.size }
+          }));
+        } catch (error) {
+          locationStatus.textContent = `PDF 生成失败：${error?.message || '请重新打开应用后再试。'}`;
+          console.error(error);
+        } finally {
+          document.body.classList.remove('pdf-rendering');
+          pdfDateLines.forEach(line => { delete line.dataset.pdfDate; });
+          exportButton.disabled = false;
+          exportButton.removeAttribute('aria-busy');
+          document.title = '售后服务工作时间表/报告 · PWA';
+        }
+      }
+
+      document.getElementById('exportPdf').addEventListener('click', () => {
+        closePanels();
+        closeSupplierSuggestions();
+        if (!signaturePadModal.hidden) closeSignaturePad();
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        saveLocalState();
+        if (isMobileLayout()) {
+          generateMobilePdf();
+          return;
+        }
+        const firstDate = document.querySelector('.linked-date')?.value || isoDate(new Date());
+        document.title = `售后服务工作时间表-${firstDate}`;
+        locationStatus.textContent = '正在打开打印窗口：请选择“另存为 PDF”、A4、100% 缩放，并关闭页眉和页脚。';
+        window.print();
+      });
+
+      window.addEventListener('afterprint', () => {
+        document.title = '售后服务工作时间表/报告 · PWA';
+        locationStatus.textContent = 'PDF 导出完成或已取消。地址与表格内容仍保留在当前页面。';
+      });
+
+      restoreLocalState();
+      renderMobileEditor();
+      setTimeout(() => locateAddress({ quiet: true }).catch(() => {}), 450);
+
+      if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./service-worker.js')
+            .then(() => navigator.serviceWorker.ready)
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V17'; })
+            .catch(() => {
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V17';
+              locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
+            });
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
