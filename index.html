@@ -2527,7 +2527,25 @@
       renderMobileEditor();
       setTimeout(() => locateAddress({ quiet: true }).catch(() => {}), 450);
 
-      if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
+
+      if (isCodespacesDev) {
+        window.addEventListener('load', async () => {
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(reg => reg.unregister()));
+          }
+
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+          }
+
+          offlineBadge.textContent = 'DEV · CACHE OFF';
+          locationStatus.textContent =
+            'Codespaces 开发模式：缓存已关闭，修改代码后刷新即可看到最新效果。';
+        });
+      } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./service-worker.js')
             .then(() => navigator.serviceWorker.ready)
