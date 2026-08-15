@@ -1,4 +1,4 @@
-const CACHE_NAME = 'service-report-github-pages-v17';
+const CACHE_NAME = 'service-report-github-pages-v18';
 const GENERATED_PDF_CACHE = 'service-report-generated-pdf-v1';
 const APP_SHELL = [
   './',
@@ -32,10 +32,30 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            const responseCopy = response.clone();
+            event.waitUntil(
+              caches.open(CACHE_NAME)
+                .then(cache => cache.put('./index.html', responseCopy))
+            );
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(event.request)
+            .then(cached => cached || caches.match('./index.html'))
+        )
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
-      if (event.request.mode === 'navigate') return caches.match('./index.html');
       return new Response('Offline resource not cached', { status: 503 });
     })
   );
