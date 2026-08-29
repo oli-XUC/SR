@@ -542,8 +542,8 @@
       left: 50%;
       top: 50%;
       display: block;
-      width: 36%;
-      height: 96%;
+      width: 34%;
+      height: 92%;
       margin: 0;
       transform: translate(-50%, -50%);
       object-fit: fill;
@@ -1300,7 +1300,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V20</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V21</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -2055,55 +2055,156 @@
         return `${name}市`;
       }
 
-      function normalizeDistrictName(value) {
-        const name = textValue(value).trim();
-        if (!name || !/[\u4e00-\u9fff]/.test(name)) return name;
-        if (/(区|县|旗)$/.test(name)) return name;
-        return `${name}区`;
-      }
-
-      function extractDistrict(...values) {
-        for (const value of values) {
-          const text = textValue(value).trim();
-          if (!text) continue;
-          const exact = text.match(/([\u4e00-\u9fff]{2,10}(?:区|县|旗))/);
-          if (exact) return exact[1];
-        }
-        const region = textValue(values[0]).trim();
-        return region && /[\u4e00-\u9fff]/.test(region) ? normalizeDistrictName(region) : '';
-      }
-
       function displayRegion(location) {
         const province = normalizeProvinceName(location.province);
         const city = normalizeCityName(location.city);
-        const district = normalizeDistrictName(location.district);
-        // 直辖市本身同时承担省级和市级行政层级，避免重复显示“上海市.上海市”。
+        const district = textValue(location.district);
         return distinct([province, city, district]).join('.');
       }
 
-      async function locateWithPconline() {
-        const data = await jsonp('https://whois.pconline.com.cn/ipJson.jsp', { level: '3' });
-        const province = textValue(data?.pro);
-        const city = textValue(data?.city);
-        const district = extractDistrict(data?.region, data?.addr, data?.address);
+      function locationScore(location) {
+        if (!location) return 0;
+        let score = 0;
+        if (textValue(location.province)) score += 1;
+        if (textValue(location.city)) score += 2;
+        if (textValue(location.district)) score += 4;
+        return score;
+      }
+
+      async function fetchJsonLocation(url, timeout = 6500) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), timeout) : null;
+        try {
+          const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`, {
+            cache: 'no-store',
+            mode: 'cors',
+            signal: controller?.signal
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      }
+
+      async function locateWithTencentJsonp() {
+        const data = await jsonp('https://r.inews.qq.com/api/ip2city', { otype: 'jsonp' }, 6500);
+        if (Number(data?.ret) !== 0 && !data?.province && !data?.city) throw new Error(textValue(data?.errMsg) || '腾讯定位失败');
         const location = {
-          province, city, district,
-          source: '自动网络定位'
+          province: textValue(data?.province),
+          city: textValue(data?.city),
+          district: textValue(data?.district),
+          source: '腾讯网络定位'
         };
-        if (!province || !city) throw new Error('自动网络定位未返回完整省市信息');
-        if (!district) throw new Error('自动网络定位暂未识别到区县');
+        if (!displayRegion(location)) throw new Error('腾讯定位未返回城市信息');
+        return location;
+      }
+
+      async function locateWithBilibili() {
+        const data = await fetchJsonLocation('https://api.bilibili.com/x/web-interface/zone');
+        if (Number(data?.code) !== 0) throw new Error(textValue(data?.message) || 'B站定位失败');
+        const body = data?.data || {};
+        const location = {
+          province: textValue(body?.province),
+          city: textValue(body?.city),
+          district: '',
+          source: 'B站网络定位'
+        };
+        if (!displayRegion(location)) throw new Error('B站定位未返回城市信息');
+        return location;
+      }
+
+      async function locateWithIpIp() {
+        const data = await fetchJsonLocation('https://myip.ipip.net/json');
+        const parts = Array.isArray(data?.data?.location) ? data.data.location : [];
+        const location = {
+          province: textValue(parts[1]),
+          city: textValue(parts[2]),
+          district: textValue(parts[3]),
+          source: 'IPIP网络定位'
+        };
+        if (!displayRegion(location)) throw new Error('IPIP定位未返回城市信息');
+        return location;
+      }
+
+      async function locateWithPconlineScript() {
+        return new Promise((resolve, reject) => {
+          const previous = window.IPCallBack;
+          const script = document.createElement('script');
+          let finished = false;
+          const cleanup = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            script.remove();
+            if (previous === undefined) {
+              try { delete window.IPCallBack; } catch (_) { window.IPCallBack = undefined; }
+            } else {
+              window.IPCallBack = previous;
+            }
+          };
+          window.IPCallBack = data => {
+            const location = {
+              province: textValue(data?.pro),
+              city: textValue(data?.city),
+              district: textValue(data?.region),
+              source: '太平洋网络定位'
+            };
+            cleanup();
+            if (!displayRegion(location)) reject(new Error('太平洋定位未返回城市信息'));
+            else resolve(location);
+          };
+          script.onerror = () => { cleanup(); reject(new Error('太平洋定位连接失败')); };
+          const timer = setTimeout(() => { cleanup(); reject(new Error('太平洋定位超时')); }, 6500);
+          script.src = `https://whois.pconline.com.cn/ipJson.jsp?_=${Date.now()}`;
+          document.head.append(script);
+        });
+      }
+
+      async function locateWithIpApiCo() {
+        const data = await fetchJsonLocation('https://ipapi.co/json/');
+        const location = {
+          province: textValue(data?.region),
+          city: textValue(data?.city),
+          district: '',
+          source: '国际备用网络定位'
+        };
+        if (!displayRegion(location)) throw new Error('国际备用定位未返回城市信息');
         return location;
       }
 
       async function resolveLocation({ force = false } = {}) {
         if (cachedLocation && !force) return cachedLocation;
-        cachedLocation = await locateWithPconline();
-        cachedLocation.source = '自动网络定位';
+
+        /* Do not call navigator.geolocation here. iPhone/Safari therefore will not
+           show a location-permission dialog. All providers infer region from the
+           current public network IP and we keep the richest result returned. */
+        const providers = [
+          locateWithTencentJsonp,
+          locateWithBilibili,
+          locateWithIpIp,
+          locateWithPconlineScript,
+          locateWithIpApiCo
+        ];
+        const settled = await Promise.allSettled(providers.map(provider => provider()));
+        const locations = settled
+          .filter(result => result.status === 'fulfilled')
+          .map(result => result.value)
+          .filter(location => displayRegion(location));
+        if (!locations.length) {
+          const errors = settled
+            .filter(result => result.status === 'rejected')
+            .map(result => result.reason?.message || String(result.reason || ''))
+            .filter(Boolean);
+          throw new Error(`无法获取位置（${errors.slice(-2).join('；') || '网络定位服务不可用'}）`);
+        }
+        locations.sort((a, b) => locationScore(b) - locationScore(a));
+        cachedLocation = locations[0];
         return cachedLocation;
       }
 
       async function locateAddress({ quiet = false, force = false } = {}) {
-        if (!quiet) locationStatus.textContent = '正在自动识别省、市、区县（无需定位授权）…';
+        if (!quiet) locationStatus.textContent = '正在自动识别省、市和区县…';
         try {
           const location = await resolveLocation({ force });
           const address = displayRegion(location);
@@ -2112,7 +2213,7 @@
             scheduleLocalSave();
             syncMobileControlsFromReport();
           }
-          locationStatus.textContent = `已自动定位到省、市、区县：${address}；内容可手动修改。`;
+          locationStatus.textContent = `已自动定位：${address}；内容可手动修改。`;
           return location;
         } catch (error) {
           locationStatus.textContent = `自动定位失败：${error.message}。地址仍可手动填写。`;
@@ -2285,7 +2386,7 @@
       }
 
       function signaturePixelRatio() {
-        return Math.max(2, Math.min(window.devicePixelRatio || 1, 4));
+        return Math.max(4, Math.min((window.devicePixelRatio || 1) * 1.9, 6));
       }
 
       function clearSignatureCanvas() {
@@ -2371,9 +2472,9 @@
       }
 
       function signatureLineWidth(point) {
-        if (point.pointerType === 'pen') return 1.00 + point.pressure * 2.35;
-        if (point.pointerType === 'touch') return 2.25;
-        return 2.05;
+        if (point.pointerType === 'pen') return 0.45 + point.pressure * 1.30;
+        if (point.pointerType === 'touch') return 1.20;
+        return 1.05;
       }
 
       function beginSignatureStroke(event) {
@@ -2935,7 +3036,7 @@
           }
           await new Promise(resolve => setTimeout(resolve, 80));
           locationStatus.textContent = '正在生成 PDF（2/3）：绘制报告表格…';
-          const scale = isIOS ? 1.75 : Math.min(2.2, Math.max(1.8, (window.devicePixelRatio || 2) * .75));
+          const scale = isIOS ? 2.80 : Math.min(3.0, Math.max(2.25, (window.devicePixelRatio || 2) * .95));
           const renderWidth = Math.ceil(reportPage.offsetWidth);
           const renderHeight = Math.ceil(reportPage.offsetHeight);
           const captureViewportWidth = Math.max(1200, renderWidth + 120);
@@ -2997,8 +3098,8 @@
             subject: '售后服务工作时间表/报告',
             creator: 'Private Offline Service Report PWA'
           });
-          const previewImageUrl = canvas.toDataURL('image/jpeg', .92);
-          pdf.addImage(canvas.toDataURL('image/jpeg', .96), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+          const previewImageUrl = canvas.toDataURL('image/jpeg', .96);
+          pdf.addImage(canvas.toDataURL('image/jpeg', .99), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
           const blob = pdf.output('blob');
           window.__lastGeneratedPdfBlob = blob;
           const { pdfUrl, blobUrl, cached } = await publishGeneratedPdf(blob, fileName);
@@ -3058,7 +3159,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V20';
+      const APP_BUILD = 'V21';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -3104,11 +3205,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=20', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=19', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V20'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V21'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V20';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V21';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
