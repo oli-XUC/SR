@@ -1306,7 +1306,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V22</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V24</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -3089,10 +3089,21 @@
         }
       }
 
+      function safePdfFilePart(value, fallback = '') {
+        const cleaned = String(value || '')
+          .trim()
+          .replace(/[\\/:*?"<>|]/g, '-')
+          .replace(/\s+/g, ' ')
+          .replace(/[. ]+$/g, '')
+          .slice(0, 80);
+        return cleaned || fallback;
+      }
+
       async function generateMobilePdf({ purpose = 'final' } = {}) {
         const exportButton = document.getElementById('exportPdf');
         const firstDate = document.querySelector('.linked-date')?.value || isoDate(new Date());
-        const fileName = `售后服务工作时间表-${firstDate}.pdf`;
+        const companyNameForFile = safePdfFilePart(companyField?.value, '售后服务工作时间表');
+        const fileName = `${companyNameForFile}-服务报告-${safePdfFilePart(firstDate, isoDate(new Date()))}.pdf`;
         const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         pdfReadyPanel.hidden = true;
         exportButton.disabled = true;
@@ -3232,7 +3243,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V22';
+      const APP_BUILD = 'V24';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -3278,11 +3289,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=22', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=24', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V22'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V24'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V22';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V24';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
