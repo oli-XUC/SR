@@ -542,11 +542,11 @@
       left: 50%;
       top: 50%;
       display: block;
-      width: 50%;
-      height: 86%;
+      width: 36%;
+      height: 96%;
       margin: 0;
       transform: translate(-50%, -50%);
-      object-fit: contain;
+      object-fit: fill;
       image-rendering: auto;
       pointer-events: none;
     }
@@ -1300,7 +1300,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V19</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V20</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -2055,59 +2055,43 @@
         return `${name}市`;
       }
 
+      function normalizeDistrictName(value) {
+        const name = textValue(value).trim();
+        if (!name || !/[\u4e00-\u9fff]/.test(name)) return name;
+        if (/(区|县|旗)$/.test(name)) return name;
+        return `${name}区`;
+      }
+
+      function extractDistrict(...values) {
+        for (const value of values) {
+          const text = textValue(value).trim();
+          if (!text) continue;
+          const exact = text.match(/([\u4e00-\u9fff]{2,10}(?:区|县|旗))/);
+          if (exact) return exact[1];
+        }
+        const region = textValue(values[0]).trim();
+        return region && /[\u4e00-\u9fff]/.test(region) ? normalizeDistrictName(region) : '';
+      }
+
       function displayRegion(location) {
         const province = normalizeProvinceName(location.province);
         const city = normalizeCityName(location.city);
-        const district = textValue(location.district);
+        const district = normalizeDistrictName(location.district);
+        // 直辖市本身同时承担省级和市级行政层级，避免重复显示“上海市.上海市”。
         return distinct([province, city, district]).join('.');
       }
 
       async function locateWithPconline() {
         const data = await jsonp('https://whois.pconline.com.cn/ipJson.jsp', { level: '3' });
+        const province = textValue(data?.pro);
+        const city = textValue(data?.city);
+        const district = extractDistrict(data?.region, data?.addr, data?.address);
         const location = {
-          province: textValue(data?.pro), city: textValue(data?.city), district: textValue(data?.region),
-          source: '国内 IP 定位'
+          province, city, district,
+          source: '自动网络定位'
         };
-        if (!displayRegion(location)) throw new Error('国内 IP 服务未返回城市信息');
-        return location;
-      }
-
-      function getDevicePosition() {
-        return new Promise((resolve, reject) => {
-          if (!navigator.geolocation) {
-            reject(new Error('当前浏览器不支持设备定位'));
-            return;
-          }
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 120000
-          });
-        });
-      }
-
-      async function locateWithDevicePosition() {
-        const position = await getDevicePosition();
-        const query = new URLSearchParams({
-          latitude: String(position.coords.latitude),
-          longitude: String(position.coords.longitude),
-          localityLanguage: 'zh'
-        });
-        const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${query.toString()}`, {
-          cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`设备位置解析失败（${response.status}）`);
-        const data = await response.json();
-        const province = textValue(data?.principalSubdivision);
-        const city = textValue(data?.city) || textValue(data?.locality);
-        const locality = textValue(data?.locality);
-        const administrative = Array.isArray(data?.localityInfo?.administrative) ? data.localityInfo.administrative : [];
-        const adminDistrict = administrative
-          .map(item => textValue(item?.name))
-          .find(name => name && name !== province && name !== city && /(区|县|旗)$/.test(name));
-        const district = adminDistrict || ((locality && locality !== city && locality !== province) ? locality : '');
-        const location = { province, city, district, source: '设备定位' };
-        if (!displayRegion(location)) throw new Error('设备定位未返回城市信息');
+        if (!province || !city) throw new Error('自动网络定位未返回完整省市信息');
+        if (!district) throw new Error('自动网络定位暂未识别到区县');
         return location;
       }
 
@@ -2119,7 +2103,7 @@
       }
 
       async function locateAddress({ quiet = false, force = false } = {}) {
-        if (!quiet) locationStatus.textContent = '正在自动识别省、市和区县…';
+        if (!quiet) locationStatus.textContent = '正在自动识别省、市、区县（无需定位授权）…';
         try {
           const location = await resolveLocation({ force });
           const address = displayRegion(location);
@@ -2128,7 +2112,7 @@
             scheduleLocalSave();
             syncMobileControlsFromReport();
           }
-          locationStatus.textContent = `已自动定位：${address}；内容可手动修改。`;
+          locationStatus.textContent = `已自动定位到省、市、区县：${address}；内容可手动修改。`;
           return location;
         } catch (error) {
           locationStatus.textContent = `自动定位失败：${error.message}。地址仍可手动填写。`;
@@ -2387,9 +2371,9 @@
       }
 
       function signatureLineWidth(point) {
-        if (point.pointerType === 'pen') return 0.55 + point.pressure * 1.65;
-        if (point.pointerType === 'touch') return 1.45;
-        return 1.25;
+        if (point.pointerType === 'pen') return 1.00 + point.pressure * 2.35;
+        if (point.pointerType === 'touch') return 2.25;
+        return 2.05;
       }
 
       function beginSignatureStroke(event) {
@@ -3074,7 +3058,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V19';
+      const APP_BUILD = 'V20';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -3120,11 +3104,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=19', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=20', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V19'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V20'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V19';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V20';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
