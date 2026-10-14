@@ -1437,7 +1437,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V26</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V27</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -3210,9 +3210,48 @@
       }
 
       function clearLocalReport() {
-        if (!confirm('确定清除这台设备缓存的报告内容、客户签字和公司签字吗？建议先导出备份。')) return;
+        if (!confirm('确定清空当前报告中的全部表格数据、客户签字和公司签字吗？\n\n此操作不会删除离线功能、日期/时间选择、N/A 下拉菜单、定位、PDF 预览、缩放和自动保存等功能。')) return;
+
+        clearTimeout(localSaveTimer);
+        closePanels();
+        closeSupplierSuggestions();
+        closeGlobalSuggestions();
+        if (!signaturePadModal.hidden) closeSignaturePad();
+
+        customerPdfReviewPanel.hidden = true;
+        document.body.classList.remove('pdf-review-open');
+        latestCustomerReviewPdf = null;
+        customerPdfReviewImage.removeAttribute('src');
+
+        restoringLocalState = true;
+        try {
+          // 恢复默认工作日行数，但不保留任何旧输入内容。
+          rebuildDailyRows([]);
+
+          // 只清空“报告数据”。datalist、按钮、日历、时间菜单、PWA 缓存等功能配置不受影响。
+          document.querySelectorAll('[name]').forEach(element => {
+            if (element.matches('input[type=\"checkbox\"], input[type=\"radio\"]')) {
+              element.checked = false;
+            } else if ('value' in element) {
+              element.value = '';
+            }
+          });
+
+          cachedLocation = null;
+          renderStoredSignatures();
+          syncSignatureDateDisplays();
+          refreshDailyLayout();
+          resetPdfReviewZoom();
+        } finally {
+          restoringLocalState = false;
+        }
+
+        // 用一份“空白报告状态”替换旧缓存，防止返回页面时旧数据再次恢复。
         localStorage.removeItem(STORAGE_KEY);
-        location.reload();
+        saveLocalState();
+        renderMobileEditor();
+        syncMobileControlsFromReport();
+        locationStatus.textContent = '已清空当前报告全部表格数据和两处签字；原有功能均保留。';
       }
 
       async function showInstallPrompt() {
@@ -3664,7 +3703,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V26';
+      const APP_BUILD = 'V27';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -3710,11 +3749,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=26', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=27', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V26'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V27'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V26';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V27';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
