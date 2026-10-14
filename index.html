@@ -1021,14 +1021,49 @@
       padding: 10px;
     }
 
-    .pdf-review-hint { margin: 0 0 9px; color: #444b52; font-size: 12px; line-height: 1.45; }
+    .pdf-review-hint { margin: 0 0 8px; color: #444b52; font-size: 12px; line-height: 1.45; }
+    .pdf-review-zoom-controls {
+      position: sticky;
+      z-index: 4;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: max-content;
+      max-width: 100%;
+      margin: 0 auto 8px;
+      padding: 5px 7px;
+      border: 1px solid rgba(183, 187, 192, .9);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .10);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+    .pdf-review-zoom-controls button {
+      min-width: 36px;
+      height: 34px;
+      border: 1px solid #c5c8cc;
+      border-radius: 8px;
+      padding: 0 10px;
+      color: #292d31;
+      background: #f7f8f9;
+      font: 700 14px/1 -apple-system, "Microsoft YaHei", sans-serif;
+    }
+    .pdf-review-zoom-controls .zoom-value { min-width: 64px; }
+    .pdf-review-zoom-tip { color: #626970; font-size: 11px; white-space: nowrap; }
     .pdf-review-preview {
       display: block;
       width: 100%;
+      max-width: none;
       height: auto;
       margin: 0 auto;
       background: #fff;
       box-shadow: 0 2px 14px rgba(0, 0, 0, .16);
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-user-drag: none;
     }
 
     .pdf-review-actions {
@@ -1402,7 +1437,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V25</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V26</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -1607,7 +1642,7 @@
                     <div class="signature-date-line"><span>日期 Date：</span><span class="signature-date-value" id="customerSignatureDateValue"></span><input type="hidden" name="customer_signature_date" aria-label="客户签字日期"></div>
                   </section>
                   <section class="signature-party">
-                    <div class="party-name">乐嘉文制药科技有限公司</div>
+                    <div class="party-name">乐嘉文工业技术（上海）有限公司</div>
                     <div class="signature-entry customer-signature-entry" id="companySignatureEntry" role="button" tabindex="0" aria-label="打开公司手写签字板">
                       <button class="signature-launch" id="companySignatureLaunch" type="button">请在报告预览中签字 / Sign in report preview</button>
                       <img class="captured-signature" id="companySignatureImage" alt="公司手写签字" hidden>
@@ -1664,7 +1699,13 @@
         <button class="pdf-review-close" id="closeCustomerPdfReview" type="button" aria-label="关闭 PDF 预览">×</button>
       </header>
       <div class="pdf-review-scroll" id="customerPdfReviewScroll">
-        <p class="pdf-review-hint">下面是完整 A4 报告预览，可上下滚动查看全部内容。每次保存签字后，预览会自动更新。</p>
+        <p class="pdf-review-hint">下面是完整 A4 报告预览，可上下滚动查看全部内容；可用 +/- 或双指缩放页面。每次保存签字后，预览会自动更新。</p>
+        <div class="pdf-review-zoom-controls" aria-label="报告预览缩放">
+          <button type="button" id="pdfReviewZoomOut" aria-label="缩小预览">−</button>
+          <button type="button" class="zoom-value" id="pdfReviewZoomReset" aria-label="恢复 100%">100%</button>
+          <button type="button" id="pdfReviewZoomIn" aria-label="放大预览">＋</button>
+          <span class="pdf-review-zoom-tip">双指缩放</span>
+        </div>
         <img class="pdf-review-preview" id="customerPdfReviewImage" alt="完整 PDF 报告预览">
       </div>
       <div class="pdf-review-sign-status" id="pdfReviewSignStatus">客户：未签字　公司：未签字</div>
@@ -1726,6 +1767,9 @@
       const customerPdfReviewPanel = document.getElementById('customerPdfReviewPanel');
       const customerPdfReviewImage = document.getElementById('customerPdfReviewImage');
       const customerPdfReviewScroll = document.getElementById('customerPdfReviewScroll');
+      const pdfReviewZoomOutButton = document.getElementById('pdfReviewZoomOut');
+      const pdfReviewZoomResetButton = document.getElementById('pdfReviewZoomReset');
+      const pdfReviewZoomInButton = document.getElementById('pdfReviewZoomIn');
       const reviewCustomerSignButton = document.getElementById('reviewCustomerSign');
       const reviewCompanySignButton = document.getElementById('reviewCompanySign');
       const generateSignedReportButton = document.getElementById('generateSignedReport');
@@ -2928,6 +2972,57 @@
         }
       }
 
+      let pdfReviewZoom = 1;
+      let pdfReviewPinchStartDistance = 0;
+      let pdfReviewPinchStartZoom = 1;
+
+      function clampPdfReviewZoom(value) {
+        return Math.max(.70, Math.min(3.00, Number(value) || 1));
+      }
+
+      function updatePdfReviewZoomLabel() {
+        if (pdfReviewZoomResetButton) pdfReviewZoomResetButton.textContent = `${Math.round(pdfReviewZoom * 100)}%`;
+      }
+
+      function setPdfReviewZoom(value, { preserveCenter = true } = {}) {
+        const nextZoom = clampPdfReviewZoom(value);
+        const previousZoom = pdfReviewZoom || 1;
+        if (Math.abs(nextZoom - previousZoom) < .001) {
+          updatePdfReviewZoomLabel();
+          return;
+        }
+        const scroller = customerPdfReviewScroll;
+        const centerXRatio = preserveCenter && scroller.scrollWidth
+          ? (scroller.scrollLeft + scroller.clientWidth / 2) / scroller.scrollWidth
+          : .5;
+        const centerYRatio = preserveCenter && scroller.scrollHeight
+          ? (scroller.scrollTop + scroller.clientHeight / 2) / scroller.scrollHeight
+          : 0;
+        pdfReviewZoom = nextZoom;
+        customerPdfReviewImage.style.width = `${(pdfReviewZoom * 100).toFixed(1)}%`;
+        updatePdfReviewZoomLabel();
+        if (preserveCenter) {
+          requestAnimationFrame(() => {
+            scroller.scrollLeft = Math.max(0, centerXRatio * scroller.scrollWidth - scroller.clientWidth / 2);
+            scroller.scrollTop = Math.max(0, centerYRatio * scroller.scrollHeight - scroller.clientHeight / 2);
+          });
+        }
+      }
+
+      function resetPdfReviewZoom() {
+        pdfReviewZoom = 1;
+        customerPdfReviewImage.style.width = '100%';
+        updatePdfReviewZoomLabel();
+        customerPdfReviewScroll.scrollLeft = 0;
+      }
+
+      function pdfReviewTouchDistance(touches) {
+        if (!touches || touches.length < 2) return 0;
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+      }
+
       async function refreshSignatureReviewPdf() {
         locationStatus.textContent = '正在更新签字后的完整 PDF 预览…';
         const reviewPdf = await generateMobilePdf({ purpose: 'review' });
@@ -3132,8 +3227,10 @@
       }
 
       function closeCustomerPdfReview() {
+        saveLocalState();
         customerPdfReviewPanel.hidden = true;
         document.body.classList.remove('pdf-review-open');
+        syncMobileControlsFromReport();
       }
 
 
@@ -3148,6 +3245,7 @@
         if (!reviewPdf) return;
         latestCustomerReviewPdf = reviewPdf;
         customerPdfReviewImage.src = reviewPdf.previewImageUrl;
+        resetPdfReviewZoom();
         customerPdfReviewScroll.scrollTop = 0;
         updateReviewSignatureState();
         customerPdfReviewPanel.hidden = false;
@@ -3179,14 +3277,26 @@
           updateReviewSignatureState();
           return;
         }
+        /* Flush all report fields and both signatures before leaving the review layer.
+           This guarantees that returning from the PDF viewer restores the completed report. */
+        saveLocalState();
         closeCustomerPdfReview();
         locationStatus.textContent = '公司签字已完成，正在生成PDF…';
-        await generateMobilePdf({ purpose: 'final' });
+        const generated = await generateMobilePdf({ purpose: 'final' });
+        if (generated) saveLocalState();
       }
 
       function openLatestGeneratedPdf() {
         if (!latestGeneratedPdf?.pdfUrl) return;
-        window.location.assign(latestGeneratedPdf.pdfUrl);
+        saveLocalState();
+        /* Open the PDF separately so the report app remains alive with all entered data. */
+        const link = document.createElement('a');
+        link.href = latestGeneratedPdf.pdfUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        document.body.append(link);
+        link.click();
+        link.remove();
       }
 
       function downloadLatestGeneratedPdf() {
@@ -3225,6 +3335,24 @@
       document.getElementById('closePdfReady').addEventListener('click', () => { pdfReadyPanel.hidden = true; });
       reviewCustomerSignButton.addEventListener('click', () => beginSignatureAfterReview('customer'));
       reviewCompanySignButton.addEventListener('click', () => beginSignatureAfterReview('company'));
+      pdfReviewZoomOutButton?.addEventListener('click', () => setPdfReviewZoom(pdfReviewZoom - .25));
+      pdfReviewZoomResetButton?.addEventListener('click', () => setPdfReviewZoom(1));
+      pdfReviewZoomInButton?.addEventListener('click', () => setPdfReviewZoom(pdfReviewZoom + .25));
+      customerPdfReviewScroll.addEventListener('touchstart', event => {
+        if (event.touches.length !== 2) return;
+        pdfReviewPinchStartDistance = pdfReviewTouchDistance(event.touches);
+        pdfReviewPinchStartZoom = pdfReviewZoom;
+      }, { passive: true });
+      customerPdfReviewScroll.addEventListener('touchmove', event => {
+        if (event.touches.length !== 2 || !pdfReviewPinchStartDistance) return;
+        const distance = pdfReviewTouchDistance(event.touches);
+        if (!distance) return;
+        event.preventDefault();
+        setPdfReviewZoom(pdfReviewPinchStartZoom * (distance / pdfReviewPinchStartDistance), { preserveCenter: true });
+      }, { passive: false });
+      customerPdfReviewScroll.addEventListener('touchend', event => {
+        if (event.touches.length < 2) pdfReviewPinchStartDistance = 0;
+      }, { passive: true });
       generateSignedReportButton.addEventListener('click', generateFinalSignedReport);
       document.getElementById('closeCustomerPdfReview').addEventListener('click', closeCustomerPdfReview);
       document.getElementById('backFromCustomerPdfReview').addEventListener('click', closeCustomerPdfReview);
@@ -3514,12 +3642,29 @@
         locationStatus.textContent = 'PDF 导出完成或已取消。地址与表格内容仍保留在当前页面。';
       });
 
+      window.addEventListener('pagehide', () => saveLocalState());
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') saveLocalState();
+      });
+      window.addEventListener('pageshow', event => {
+        if (!event.persisted) return;
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+        try {
+          applyLocalState(JSON.parse(stored));
+          syncMobileControlsFromReport();
+          locationStatus.textContent = '已恢复返回 PDF 前保存的报告数据。';
+        } catch (error) {
+          console.warn('Back-forward report restore failed', error);
+        }
+      });
+
       restoreLocalState();
       renderMobileEditor();
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V25';
+      const APP_BUILD = 'V26';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -3565,11 +3710,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=25', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=26', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V25'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V26'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V25';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V26';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
