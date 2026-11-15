@@ -1463,7 +1463,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V30</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V32</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -2500,6 +2500,34 @@
         return distinct([province, city, district]).join('.');
       }
 
+      function currentCityOnly(location) {
+        let city = textValue(location?.city);
+        const province = textValue(location?.province);
+        // 直辖市的部分定位服务只返回省级名称，此时仍应得到城市名。
+        if (!city && /^(北京|上海|天津|重庆)(市)?$/.test(province)) city = province;
+        if (!city) return '';
+        city = city.trim();
+        if (/[\u4e00-\u9fff]/.test(city)) {
+          return city.replace(/(特别行政区|自治州|地区|盟|市)$/, '').trim();
+        }
+        return city;
+      }
+
+      function applyCurrentCityToTravel(location) {
+        const city = currentCityOnly(location);
+        if (!city) return false;
+        let changed = false;
+        ['departure_to', 'return_from'].forEach(name => {
+          const field = reportField(name);
+          // 只给空白字段写入默认城市，绝不覆盖用户已经填写/恢复的内容。
+          if (field && !field.value.trim()) {
+            field.value = city;
+            changed = true;
+          }
+        });
+        return changed;
+      }
+
       function locationScore(location) {
         if (!location) return 0;
         let score = 0;
@@ -2612,7 +2640,7 @@
         return location;
       }
 
-      async function devicePosition({ requestPermission = false } = {}) {
+      async function devicePosition({ requestPermission = false, timeoutMs = 14000 } = {}) {
         if (!navigator.geolocation) throw new Error('当前浏览器不支持设备定位');
         if (!requestPermission) {
           if (!navigator.permissions?.query) throw new Error('无法确认是否已授权设备定位');
@@ -2623,7 +2651,7 @@
         }
         const position = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true, timeout: 14000, maximumAge: 120000
+            enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 120000
           });
         });
         lastPrecisePosition = { lat: position.coords.latitude, lon: position.coords.longitude };
@@ -2685,6 +2713,7 @@
           const location = await reversePrecisePosition(coords);
           cachedLocation = location;
           addressField.value = displayRegion(location);
+          applyCurrentCityToTravel(location);
           scheduleLocalSave();
           syncMobileControlsFromReport();
           locationStatus.textContent = location.district
@@ -2733,8 +2762,12 @@
         try {
           const location = await resolveLocation({ force });
           const address = displayRegion(location);
+          let changed = applyCurrentCityToTravel(location);
           if (address && (!addressField.value || !quiet || force)) {
             addressField.value = address;
+            changed = true;
+          }
+          if (changed) {
             scheduleLocalSave();
             syncMobileControlsFromReport();
           }
@@ -2766,7 +2799,7 @@
         const params = new URLSearchParams({
           format: 'jsonv2', q: regionText.replaceAll('.', ' '), limit: '1', 'accept-language': 'zh-CN'
         });
-        const data = await fetchJsonLocation(`https://nominatim.openstreetmap.org/search?${params}`, 9000);
+        const data = await fetchJsonLocation(`https://nominatim.openstreetmap.org/search?${params}`, 5000);
         const first = Array.isArray(data) ? data[0] : null;
         const lat = Number(first?.lat), lon = Number(first?.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('无法把当前省市区转换为地图坐标');
@@ -2779,7 +2812,8 @@
           return { lat: Number(cachedLocation.coords.lat), lon: Number(cachedLocation.coords.lon) };
         }
         try {
-          return await devicePosition({ requestPermission });
+          // 附近公司查询不能长时间卡住；这里单独把 GPS 等待限制为 6 秒。
+          return await devicePosition({ requestPermission, timeoutMs: 6000 });
         } catch (error) {
           console.warn('Precise position unavailable for nearby companies; using report region center.', error);
           return geocodeCurrentReportRegion();
@@ -2787,25 +2821,40 @@
       }
 
       async function fetchOverpassCompanies(endpoint, query) {
-        const attempts = ['POST', 'GET'];
-        let lastError = null;
-        for (const method of attempts) {
-          const controller = typeof AbortController === 'function' ? new AbortController() : null;
-          const timer = controller ? setTimeout(() => controller.abort(), 14000) : null;
-          try {
-            const url = method === 'GET' ? `${endpoint}?data=${encodeURIComponent(query)}` : endpoint;
-            const response = await fetch(url, method === 'POST'
-              ? { method: 'POST', body: new URLSearchParams({ data: query }), mode: 'cors', cache: 'no-store', signal: controller?.signal }
-              : { mode: 'cors', cache: 'no-store', signal: controller?.signal });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return await response.json();
-          } catch (error) {
-            lastError = error;
-          } finally {
-            if (timer) clearTimeout(timer);
-          }
+        // iPhone/Safari 下 POST 可能触发 CORS 预检并长时间等待，改用 GET 且硬性超时。
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), 5500) : null;
+        try {
+          const url = `${endpoint}?data=${encodeURIComponent(query)}`;
+          const response = await fetch(url, {
+            method: 'GET', mode: 'cors', cache: 'no-store', signal: controller?.signal
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } finally {
+          if (timer) clearTimeout(timer);
         }
-        throw lastError || new Error('地图接口无响应');
+      }
+
+      async function fetchNominatimCompanyFallback(coords, radius) {
+        const latDelta = Math.max(0.025, radius / 111000);
+        const lonDelta = Math.max(0.03, radius / (111000 * Math.max(0.2, Math.cos(coords.lat * Math.PI / 180))));
+        const params = new URLSearchParams({
+          format: 'jsonv2',
+          q: '有限公司',
+          limit: '40',
+          bounded: '1',
+          viewbox: `${coords.lon - lonDelta},${coords.lat + latDelta},${coords.lon + lonDelta},${coords.lat - latDelta}`,
+          'accept-language': 'zh-CN'
+        });
+        const data = await fetchJsonLocation(`https://nominatim.openstreetmap.org/search?${params}`, 5000);
+        if (!Array.isArray(data)) return [];
+        return data.map(item => ({
+          name: String(item?.display_name || '').split(',')[0].trim(),
+          lat: Number(item?.lat),
+          lon: Number(item?.lon),
+          address: String(item?.display_name || '').trim()
+        })).filter(item => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lon));
       }
 
       async function loadNearbyCompanies({ requestPermission = false, force = false } = {}) {
@@ -2814,8 +2863,8 @@
         if (!force && nearbyCompaniesPositionKey === key && Date.now() - nearbyCompaniesLoadedAt < 15 * 60 * 1000) {
           return nearbyCompanies;
         }
-        const radius = coords.approximate ? 6000 : 3500;
-        const query = `[out:json][timeout:18];(
+        const radius = coords.approximate ? 5000 : 3500;
+        const query = `[out:json][timeout:6];(
           nwr["office"]["name"](around:${radius},${coords.lat},${coords.lon});
           nwr["industrial"]["name"](around:${radius},${coords.lat},${coords.lon});
           nwr["craft"]["name"](around:${radius},${coords.lat},${coords.lon});
@@ -2823,38 +2872,49 @@
           nwr["man_made"="works"]["name"](around:${radius},${coords.lat},${coords.lon});
           nwr["building"="industrial"]["name"](around:${radius},${coords.lat},${coords.lon});
           nwr["shop"]["name"](around:${radius},${coords.lat},${coords.lon});
-        );out center 220;`;
+        );out center 140;`;
         const endpoints = [
-          'https://overpass-api.de/api/interpreter',
           'https://overpass.kumi.systems/api/interpreter',
-          'https://overpass.private.coffee/api/interpreter'
+          'https://overpass-api.de/api/interpreter',
+          'https://overpass.private.coffee/api/interpreter',
+          'https://overpass.nchc.org.tw/api/interpreter'
         ];
-        let data = null, lastError = null;
-        for (const endpoint of endpoints) {
-          try {
-            data = await fetchOverpassCompanies(endpoint, query);
-            if (data && Array.isArray(data.elements)) break;
-          } catch (error) { lastError = error; }
+
+        // 旧版逐个接口等待，最坏会超过 1 分钟。现在所有接口并行，最多约 5.5 秒。
+        const settled = await Promise.allSettled(endpoints.map(endpoint => fetchOverpassCompanies(endpoint, query)));
+        const usable = settled
+          .filter(result => result.status === 'fulfilled' && Array.isArray(result.value?.elements))
+          .map(result => result.value);
+        let rawItems = [];
+        if (usable.length) {
+          rawItems = usable.sort((a, b) => b.elements.length - a.elements.length)[0].elements.map(item => {
+            const tags = item.tags || {};
+            return {
+              name: String(tags['name:zh'] || tags.name || tags.brand || '').trim(),
+              lat: Number(item.lat ?? item.center?.lat),
+              lon: Number(item.lon ?? item.center?.lon),
+              address: [tags['addr:province'], tags['addr:city'], tags['addr:district'], tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join('')
+            };
+          });
         }
-        if (!data || !Array.isArray(data.elements)) {
-          throw new Error(`附近公司地图数据暂不可用：${lastError?.message || '无响应'}`);
+
+        // Overpass 在国内网络不可达或没有结果时，用 Nominatim 做一次轻量备用查询。
+        if (!rawItems.length) {
+          try { rawItems = await fetchNominatimCompanyFallback(coords, radius); }
+          catch (error) { console.warn('Nearby company fallback failed', error); }
         }
+
         const unique = new Map();
-        data.elements.forEach(item => {
-          const tags = item.tags || {};
-          const name = String(tags['name:zh'] || tags.name || tags.brand || '').trim();
-          const lat = Number(item.lat ?? item.center?.lat);
-          const lon = Number(item.lon ?? item.center?.lon);
+        rawItems.forEach(item => {
+          const name = String(item.name || '').trim();
+          const lat = Number(item.lat), lon = Number(item.lon);
           if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
           const distance = distanceMeters(coords, { lat, lon });
           if (!unique.has(name) || unique.get(name).distance > distance) {
-            unique.set(name, {
-              name, distance,
-              address: [tags['addr:province'], tags['addr:city'], tags['addr:district'], tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join('')
-            });
+            unique.set(name, { name, distance, address: String(item.address || '') });
           }
         });
-        nearbyCompanies = [...unique.values()].sort((a, b) => a.distance - b.distance).slice(0, 100);
+        nearbyCompanies = [...unique.values()].sort((a, b) => a.distance - b.distance).slice(0, 80);
         nearbyCompaniesPositionKey = key;
         nearbyCompaniesLoadedAt = Date.now();
         const datalist = document.getElementById('nearbyCompanyOptions');
@@ -2895,16 +2955,29 @@
         searchButton.type = 'button';
         searchButton.addEventListener('pointerdown', event => event.preventDefault());
         searchButton.addEventListener('click', async () => {
-          globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', '正在查询附近公司的地图标注…'));
+          globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', '正在查询附近公司，最多等待约 12 秒…'));
+          positionGlobalSuggestions();
           try {
-            const results = await loadNearbyCompanies({ requestPermission: true, force: true });
+            const results = await Promise.race([
+              loadNearbyCompanies({ requestPermission: true, force: true }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('查询超时')), 12000))
+            ]);
             if (activeGlobalInput === input) {
               renderNearbyCompanyDropdown(input, { showAll: true });
-              if (!results.length) locationStatus.textContent = '附近地图未收录公司，仍可手动填写或使用高德地图搜索。';
+              if (!results.length) locationStatus.textContent = '附近公司数据源暂未返回结果，可手动输入或点击“附近公司”打开地图搜索。';
             }
           } catch (error) {
             if (activeGlobalInput === input) {
-              globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', `搜索失败：${error.message}。可手动输入或使用“附近公司”地图搜索。`));
+              globalSuggestions.replaceChildren();
+              globalSuggestions.append(mobileElement('div', 'nearby-dropdown-info', `查询已停止：${error.message}。不会继续刷新。`));
+              const retryButton = mobileElement('button', '', '重新查询附近公司');
+              retryButton.type = 'button';
+              retryButton.addEventListener('pointerdown', event => event.preventDefault());
+              retryButton.addEventListener('click', () => {
+                closeGlobalSuggestions();
+                openGlobalSuggestions(input, { showAll: true });
+              });
+              globalSuggestions.append(retryButton);
               positionGlobalSuggestions();
             }
           }
@@ -4137,7 +4210,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V30';
+      const APP_BUILD = 'V32';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -4185,9 +4258,9 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./service-worker.js?v=29', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V30'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V32'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V30';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V32';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
