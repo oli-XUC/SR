@@ -1463,7 +1463,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V28</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V29</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -2184,7 +2184,11 @@
             createMobileField('结束时间 End Time', `end_time_${id}`, { list: 'timeOptions' })
           ]);
           row.append(timePair);
-          if (customerSignatureData.value.startsWith('data:image/')) {
+          const reportDailyRow = [...document.querySelectorAll('tr.daily')]
+            .find(item => Number(item.dataset.rowId) === Number(id));
+          const shouldShowDailySignature = customerSignatureData.value.startsWith('data:image/')
+            && dailyRowHasEnteredInfo(reportDailyRow);
+          if (shouldShowDailySignature) {
             const signed = mobileElement('div', 'mobile-daily-signature');
             signed.append(mobileElement('span', '', '客户签字确认 · 已同步签名'));
             const preview = document.createElement('img');
@@ -2287,8 +2291,8 @@
         closeCalendarPicker();
         activeGlobalInput = input;
         renderGlobalSuggestions({ showAll });
-        if (input.dataset.listId === 'nearbyCompanyOptions' && lastPrecisePosition && !nearbyCompaniesLoadedAt) {
-          loadNearbyCompanies().then(() => {
+        if (input.dataset.listId === 'nearbyCompanyOptions' && !nearbyCompaniesLoadedAt) {
+          loadNearbyCompanies({ requestPermission: false }).then(() => {
             if (activeGlobalInput === input) renderNearbyCompanyDropdown(input, { showAll: true });
           }).catch(error => {
             if (activeGlobalInput === input) {
@@ -2756,36 +2760,80 @@
         return 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
       }
 
+      async function geocodeCurrentReportRegion() {
+        const regionText = addressField.value.trim() || displayRegion(cachedLocation || {});
+        if (!regionText) throw new Error('当前报告还没有可用于搜索的省市区信息');
+        const params = new URLSearchParams({
+          format: 'jsonv2', q: regionText.replaceAll('.', ' '), limit: '1', 'accept-language': 'zh-CN'
+        });
+        const data = await fetchJsonLocation(`https://nominatim.openstreetmap.org/search?${params}`, 9000);
+        const first = Array.isArray(data) ? data[0] : null;
+        const lat = Number(first?.lat), lon = Number(first?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('无法把当前省市区转换为地图坐标');
+        return { lat, lon, approximate: true };
+      }
+
+      async function nearbySearchCoordinates({ requestPermission = false } = {}) {
+        if (lastPrecisePosition) return lastPrecisePosition;
+        if (cachedLocation?.coords?.lat && cachedLocation?.coords?.lon) {
+          return { lat: Number(cachedLocation.coords.lat), lon: Number(cachedLocation.coords.lon) };
+        }
+        try {
+          return await devicePosition({ requestPermission });
+        } catch (error) {
+          console.warn('Precise position unavailable for nearby companies; using report region center.', error);
+          return geocodeCurrentReportRegion();
+        }
+      }
+
+      async function fetchOverpassCompanies(endpoint, query) {
+        const attempts = ['POST', 'GET'];
+        let lastError = null;
+        for (const method of attempts) {
+          const controller = typeof AbortController === 'function' ? new AbortController() : null;
+          const timer = controller ? setTimeout(() => controller.abort(), 14000) : null;
+          try {
+            const url = method === 'GET' ? `${endpoint}?data=${encodeURIComponent(query)}` : endpoint;
+            const response = await fetch(url, method === 'POST'
+              ? { method: 'POST', body: new URLSearchParams({ data: query }), mode: 'cors', cache: 'no-store', signal: controller?.signal }
+              : { mode: 'cors', cache: 'no-store', signal: controller?.signal });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+          } catch (error) {
+            lastError = error;
+          } finally {
+            if (timer) clearTimeout(timer);
+          }
+        }
+        throw lastError || new Error('地图接口无响应');
+      }
+
       async function loadNearbyCompanies({ requestPermission = false, force = false } = {}) {
-        const coords = lastPrecisePosition || await devicePosition({ requestPermission });
+        const coords = await nearbySearchCoordinates({ requestPermission });
         const key = `${coords.lat.toFixed(3)},${coords.lon.toFixed(3)}`;
         if (!force && nearbyCompaniesPositionKey === key && Date.now() - nearbyCompaniesLoadedAt < 15 * 60 * 1000) {
           return nearbyCompanies;
         }
-        const query = `[out:json][timeout:14];(
-          nwr["office"]["name"](around:2500,${coords.lat},${coords.lon});
-          nwr["industrial"]["name"](around:2500,${coords.lat},${coords.lon});
-          nwr["craft"]["name"](around:2500,${coords.lat},${coords.lon});
-          nwr["building"="industrial"]["name"](around:2500,${coords.lat},${coords.lon});
-        );out center 150;`;
+        const radius = coords.approximate ? 6000 : 3500;
+        const query = `[out:json][timeout:18];(
+          nwr["office"]["name"](around:${radius},${coords.lat},${coords.lon});
+          nwr["industrial"]["name"](around:${radius},${coords.lat},${coords.lon});
+          nwr["craft"]["name"](around:${radius},${coords.lat},${coords.lon});
+          nwr["company"]["name"](around:${radius},${coords.lat},${coords.lon});
+          nwr["man_made"="works"]["name"](around:${radius},${coords.lat},${coords.lon});
+          nwr["building"="industrial"]["name"](around:${radius},${coords.lat},${coords.lon});
+          nwr["shop"]["name"](around:${radius},${coords.lat},${coords.lon});
+        );out center 220;`;
         const endpoints = [
           'https://overpass-api.de/api/interpreter',
-          'https://overpass.kumi.systems/api/interpreter'
+          'https://overpass.kumi.systems/api/interpreter',
+          'https://overpass.private.coffee/api/interpreter'
         ];
         let data = null, lastError = null;
         for (const endpoint of endpoints) {
           try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 12000);
-            try {
-              const response = await fetch(endpoint, {
-                method: 'POST', body: new URLSearchParams({ data: query }),
-                mode: 'cors', signal: controller.signal
-              });
-              if (!response.ok) throw new Error(`地图接口 HTTP ${response.status}`);
-              data = await response.json();
-            } finally { clearTimeout(timer); }
-            break;
+            data = await fetchOverpassCompanies(endpoint, query);
+            if (data && Array.isArray(data.elements)) break;
           } catch (error) { lastError = error; }
         }
         if (!data || !Array.isArray(data.elements)) {
@@ -2794,16 +2842,19 @@
         const unique = new Map();
         data.elements.forEach(item => {
           const tags = item.tags || {};
-          const name = String(tags['name:zh'] || tags.name || '').trim();
+          const name = String(tags['name:zh'] || tags.name || tags.brand || '').trim();
           const lat = Number(item.lat ?? item.center?.lat);
           const lon = Number(item.lon ?? item.center?.lon);
           if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
           const distance = distanceMeters(coords, { lat, lon });
           if (!unique.has(name) || unique.get(name).distance > distance) {
-            unique.set(name, { name, distance, address: [tags['addr:city'], tags['addr:district'], tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join('') });
+            unique.set(name, {
+              name, distance,
+              address: [tags['addr:province'], tags['addr:city'], tags['addr:district'], tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join('')
+            });
           }
         });
-        nearbyCompanies = [...unique.values()].sort((a, b) => a.distance - b.distance).slice(0, 80);
+        nearbyCompanies = [...unique.values()].sort((a, b) => a.distance - b.distance).slice(0, 100);
         nearbyCompaniesPositionKey = key;
         nearbyCompaniesLoadedAt = Date.now();
         const datalist = document.getElementById('nearbyCompanyOptions');
@@ -2926,9 +2977,7 @@
         try {
           const location = await resolveLocation();
           if (!addressField.value) addressField.value = displayRegion(location);
-          if (lastPrecisePosition) {
-            await loadNearbyCompanies().catch(error => console.warn('Nearby company discovery failed', error));
-          }
+          await loadNearbyCompanies({ requestPermission: false }).catch(error => console.warn('Nearby company discovery failed', error));
           renderNearbySearch(location);
         } catch (error) {
           renderNearbySearch({ city: addressField.value.trim(), district: '', province: '' });
@@ -3440,6 +3489,14 @@
         refreshDailyLayout();
       }
 
+      function dailyRowHasEnteredInfo(row) {
+        if (!row) return false;
+        return ['work_date_', 'start_time_', 'end_time_'].some(prefix => {
+          const field = row.querySelector(`input[name^="${prefix}"]`);
+          return Boolean(field?.value?.trim());
+        });
+      }
+
       function syncDailyCustomerSignatures() {
         const dataUrl = customerSignatureData.value;
         const signed = dataUrl.startsWith('data:image/');
@@ -3448,6 +3505,7 @@
           if (!input) return;
           const cell = input.closest('td');
           if (!cell) return;
+          const signedForRow = signed && dailyRowHasEnteredInfo(row);
           cell.classList.add('daily-confirmation-cell');
           let image = cell.querySelector('.daily-confirmation-signature');
           if (!image) {
@@ -3456,14 +3514,14 @@
             image.alt = '客户手写签字确认';
             cell.append(image);
           }
-          if (signed) {
+          if (signedForRow) {
             if (image.src !== dataUrl) image.src = dataUrl;
             image.hidden = false;
           } else {
             image.hidden = true;
             image.removeAttribute('src');
           }
-          input.classList.toggle('daily-confirmation-with-signature', signed);
+          input.classList.toggle('daily-confirmation-with-signature', signedForRow);
         });
       }
 
@@ -3813,10 +3871,16 @@
       });
       document.addEventListener('input', event => {
         if (event.target.matches?.('[name]')) scheduleLocalSave();
+        if (event.target.closest?.('tr.daily') && /^(work_date|start_time|end_time)_/.test(event.target.name || '')) {
+          syncDailyCustomerSignatures();
+        }
         if (event.target === activeGlobalInput) renderGlobalSuggestions();
       });
       document.addEventListener('change', event => {
         if (event.target.matches?.('[name]')) scheduleLocalSave();
+        if (event.target.closest?.('tr.daily') && /^(work_date|start_time|end_time)_/.test(event.target.name || '')) {
+          syncDailyCustomerSignatures();
+        }
       });
       window.addEventListener('resize', () => { if (!supplierSuggestions.hidden) positionSupplierSuggestions(); });
       window.addEventListener('scroll', () => { if (!supplierSuggestions.hidden) positionSupplierSuggestions(); }, true);
@@ -4055,7 +4119,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V28';
+      const APP_BUILD = 'V29';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -4101,11 +4165,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=28', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=29', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V28'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V29'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V28';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V29';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
