@@ -1463,7 +1463,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V32</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V33</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -1866,6 +1866,8 @@
       const DEFAULT_NOTES_HEIGHT_MM = 36.66;
       const STORAGE_KEY = 'rieckermann-service-report-private-offline-v1';
       const BACKUP_KIND = 'rieckermann-service-report-backup';
+      const COMPANY_HISTORY_KEY = 'rieckermann-service-report-company-history-v1';
+      const COMPANY_HISTORY_LIMIT = 80;
       const ORDER_PREFIXES = ['4PT', '4PK', '4PZ', '4F', '4E', '4H'];
       const DEFAULT_REPORT_VALUES = Object.freeze({
         departure_from: '上海',
@@ -1888,6 +1890,76 @@
       let nearbyCompanies = [];
       let nearbyCompaniesPositionKey = '';
       let nearbyCompaniesLoadedAt = 0;
+
+      function companyCityKey(value) {
+        return textValue(value).replace(/^(?:中国|中华人民共和国)[·.\s]*/, '').replace(/市$/, '').trim();
+      }
+
+      function currentCompanyCityKey() {
+        const fromLocation = companyCityKey(cachedLocation?.city);
+        if (fromLocation) return fromLocation;
+        const parts = textValue(addressField?.value).split(/[.·]/).map(item => item.trim()).filter(Boolean);
+        const explicitCity = parts.find(item => /市$/.test(item));
+        if (explicitCity) return companyCityKey(explicitCity);
+        return companyCityKey(parts[1] || parts[0] || '');
+      }
+
+      function readCompanyHistory() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(COMPANY_HISTORY_KEY) || '[]');
+          if (!Array.isArray(parsed)) return [];
+          return parsed.filter(item => item && typeof item.name === 'string' && item.name.trim()).map(item => ({
+            name: item.name.trim(),
+            city: companyCityKey(item.city),
+            address: textValue(item.address),
+            usedAt: Number(item.usedAt) || 0
+          }));
+        } catch (error) {
+          console.warn('Company history read failed', error);
+          return [];
+        }
+      }
+
+      function writeCompanyHistory(items) {
+        try {
+          localStorage.setItem(COMPANY_HISTORY_KEY, JSON.stringify(items.slice(0, COMPANY_HISTORY_LIMIT)));
+        } catch (error) {
+          console.warn('Company history write failed', error);
+        }
+      }
+
+      function rememberCompanyHistory(name = companyField?.value, address = addressField?.value) {
+        const cleanName = textValue(name);
+        if (!cleanName || cleanName === 'N/A' || cleanName.length < 2) return;
+        const city = currentCompanyCityKey();
+        const history = readCompanyHistory().filter(item => item.name.toLocaleLowerCase() !== cleanName.toLocaleLowerCase());
+        history.unshift({ name: cleanName, city, address: textValue(address), usedAt: Date.now() });
+        writeCompanyHistory(history);
+        refreshCompanySuggestionDatalist();
+      }
+
+      function companyHistoryForCurrentCity() {
+        const history = readCompanyHistory().sort((a, b) => b.usedAt - a.usedAt);
+        const city = currentCompanyCityKey();
+        if (!city) return history;
+        const local = history.filter(item => item.city === city);
+        return local.length ? local : history;
+      }
+
+      function refreshCompanySuggestionDatalist() {
+        const datalist = document.getElementById('nearbyCompanyOptions');
+        if (!datalist) return;
+        const names = [];
+        const seen = new Set();
+        [...companyHistoryForCurrentCity().map(item => item.name), ...nearbyCompanies.map(item => item.name)].forEach(name => {
+          const clean = textValue(name);
+          const key = clean.toLocaleLowerCase();
+          if (!clean || seen.has(key)) return;
+          seen.add(key);
+          names.push(clean);
+        });
+        datalist.replaceChildren(...names.map(name => new Option(name, name)));
+      }
 
       const pad = number => String(number).padStart(2, '0');
       const isoDate = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -1972,6 +2044,7 @@
         }
         input.addEventListener('input', () => pushMobileValue(input, source));
         input.addEventListener('change', () => pushMobileValue(input, source));
+        if (name === 'company_name') input.addEventListener('blur', () => rememberCompanyHistory(source.value, addressField.value));
         if (isCalendarField) input.addEventListener('click', () => openCalendarPicker(input));
         if (isTimePicker) input.addEventListener('click', () => openGlobalSuggestions(input, { showAll: true }));
         wrap.append(input);
@@ -2290,16 +2363,10 @@
         if (!input?.dataset.listId && !input?.getAttribute('list')) return;
         closeCalendarPicker();
         activeGlobalInput = input;
+        // 公司名称下拉优先读取本机历史记录；不再因打开下拉框而自动访问国外地图接口。
+        // 这样在国内 5G 下也能立即显示，不会出现长时间“正在查询”。
+        if (input.dataset.listId === 'nearbyCompanyOptions') refreshCompanySuggestionDatalist();
         renderGlobalSuggestions({ showAll });
-        if (input.dataset.listId === 'nearbyCompanyOptions' && !nearbyCompaniesLoadedAt) {
-          loadNearbyCompanies({ requestPermission: false }).then(() => {
-            if (activeGlobalInput === input) renderNearbyCompanyDropdown(input, { showAll: true });
-          }).catch(error => {
-            if (activeGlobalInput === input) {
-              globalSuggestions.prepend(mobileElement('div', 'nearby-dropdown-info', `地图查询失败：${error.message}`));
-            }
-          });
-        }
       }
 
       function closeGlobalSuggestions() {
@@ -2917,89 +2984,136 @@
         nearbyCompanies = [...unique.values()].sort((a, b) => a.distance - b.distance).slice(0, 80);
         nearbyCompaniesPositionKey = key;
         nearbyCompaniesLoadedAt = Date.now();
-        const datalist = document.getElementById('nearbyCompanyOptions');
-        datalist.replaceChildren(...nearbyCompanies.map(item => new Option(item.name, item.name)));
+        refreshCompanySuggestionDatalist();
         return nearbyCompanies;
       }
 
       function selectNearbyCompany(item) {
         companyField.value = item.name;
         companyField.dispatchEvent(new Event('input', { bubbles: true }));
+        rememberCompanyHistory(item.name, item.address || addressField.value);
         scheduleLocalSave();
         syncMobileControlsFromReport();
         closeGlobalSuggestions();
         locationPanel.hidden = true;
-        locationStatus.textContent = `已选择附近公司：${item.name}（地图标注，距离约 ${Math.round(item.distance)} 米）。`;
+        locationStatus.textContent = `已选择公司：${item.name}。该公司已加入本机历史下拉列表。`;
+      }
+
+      function selectHistoricalCompany(item) {
+        companyField.value = item.name;
+        companyField.dispatchEvent(new Event('input', { bubbles: true }));
+        rememberCompanyHistory(item.name, item.address || addressField.value);
+        scheduleLocalSave();
+        syncMobileControlsFromReport();
+        closeGlobalSuggestions();
+        locationStatus.textContent = `已从本机历史记录选择公司：${item.name}`;
       }
 
       function renderNearbyCompanyDropdown(input, { showAll = false } = {}) {
         if (!input) return;
         globalSuggestions.replaceChildren();
         const query = showAll ? '' : input.value.trim().toLocaleLowerCase();
-        const matches = nearbyCompanies.filter(item => !query || item.name.toLocaleLowerCase().includes(query));
-        if (matches.length) {
-          matches.forEach(item => {
-            const button = mobileElement('button', '', `${item.name} · 约 ${Math.round(item.distance)} 米`);
-            button.type = 'button';
-            button.addEventListener('pointerdown', event => event.preventDefault());
-            button.addEventListener('click', () => selectNearbyCompany(item));
-            globalSuggestions.append(button);
-          });
-        } else {
-          const info = mobileElement('div', 'nearby-dropdown-info', nearbyCompaniesLoadedAt
-            ? '当前位置附近没有找到匹配的公司，可手动输入。'
-            : '点击下方按钮搜索附近公司（需要定位和网络）。');
-          globalSuggestions.append(info);
+        const history = companyHistoryForCurrentCity().filter(item => !query || item.name.toLocaleLowerCase().includes(query));
+        const nearby = nearbyCompanies.filter(item => !query || item.name.toLocaleLowerCase().includes(query));
+        const shown = new Set();
+
+        history.forEach(item => {
+          const key = item.name.toLocaleLowerCase();
+          if (shown.has(key)) return;
+          shown.add(key);
+          const suffix = item.city ? ` · 历史 · ${item.city}` : ' · 历史';
+          const button = mobileElement('button', '', `${item.name}${suffix}`);
+          button.type = 'button';
+          button.addEventListener('pointerdown', event => event.preventDefault());
+          button.addEventListener('click', () => selectHistoricalCompany(item));
+          globalSuggestions.append(button);
+        });
+
+        nearby.forEach(item => {
+          const key = item.name.toLocaleLowerCase();
+          if (shown.has(key)) return;
+          shown.add(key);
+          const button = mobileElement('button', '', `${item.name} · 联网 · 约 ${Math.round(item.distance)} 米`);
+          button.type = 'button';
+          button.addEventListener('pointerdown', event => event.preventDefault());
+          button.addEventListener('click', () => selectNearbyCompany(item));
+          globalSuggestions.append(button);
+        });
+
+        if (!shown.size) {
+          globalSuggestions.append(mobileElement('div', 'nearby-dropdown-info',
+            readCompanyHistory().length
+              ? '当前城市没有匹配的历史公司；可继续输入，完成后会自动加入历史。'
+              : '暂无公司历史记录。输入公司名称后会自动保存在本机下拉列表。'));
         }
-        const searchButton = mobileElement('button', '', '搜索/刷新附近公司');
-        searchButton.type = 'button';
-        searchButton.addEventListener('pointerdown', event => event.preventDefault());
-        searchButton.addEventListener('click', async () => {
-          globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', '正在查询附近公司，最多等待约 12 秒…'));
+
+        const onlineButton = mobileElement('button', '', '尝试联网刷新附近公司（最多 5 秒）');
+        onlineButton.type = 'button';
+        onlineButton.addEventListener('pointerdown', event => event.preventDefault());
+        onlineButton.addEventListener('click', async () => {
+          globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', '正在尝试联网查询附近公司，最多等待 5 秒…'));
           positionGlobalSuggestions();
           try {
             const results = await Promise.race([
-              loadNearbyCompanies({ requestPermission: true, force: true }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('查询超时')), 12000))
+              loadNearbyCompanies({ requestPermission: false, force: true }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('国内网络数据源暂不可用')), 5000))
             ]);
             if (activeGlobalInput === input) {
               renderNearbyCompanyDropdown(input, { showAll: true });
-              if (!results.length) locationStatus.textContent = '附近公司数据源暂未返回结果，可手动输入或点击“附近公司”打开地图搜索。';
+              locationStatus.textContent = results.length
+                ? `已额外取得 ${results.length} 个附近地图标注。`
+                : '联网接口没有返回附近公司；本机历史下拉仍可正常使用。';
             }
           } catch (error) {
             if (activeGlobalInput === input) {
-              globalSuggestions.replaceChildren();
-              globalSuggestions.append(mobileElement('div', 'nearby-dropdown-info', `查询已停止：${error.message}。不会继续刷新。`));
-              const retryButton = mobileElement('button', '', '重新查询附近公司');
-              retryButton.type = 'button';
-              retryButton.addEventListener('pointerdown', event => event.preventDefault());
-              retryButton.addEventListener('click', () => {
-                closeGlobalSuggestions();
-                openGlobalSuggestions(input, { showAll: true });
-              });
-              globalSuggestions.append(retryButton);
+              renderNearbyCompanyDropdown(input, { showAll: true });
+              globalSuggestions.prepend(mobileElement('div', 'nearby-dropdown-info', '联网查询未成功；已停止等待。本机历史列表不受影响。'));
               positionGlobalSuggestions();
             }
           }
         });
-        globalSuggestions.append(searchButton);
+        globalSuggestions.append(onlineButton);
+
+        const mapButton = mobileElement('button', '', '打开地图搜索附近公司');
+        mapButton.type = 'button';
+        mapButton.addEventListener('pointerdown', event => event.preventDefault());
+        mapButton.addEventListener('click', () => {
+          closeGlobalSuggestions();
+          openNearbyCompanies();
+        });
+        globalSuggestions.append(mapButton);
         globalSuggestions.hidden = false;
         positionGlobalSuggestions();
       }
 
       function renderNearbySearch(location) {
         const region = displayRegion(location) || addressField.value.trim();
-        const city = textValue(location.city) || region;
-        const keyword = companyField.value.trim() || `${textValue(location.district)} 公司`.trim();
+        const city = textValue(location.city) || currentCompanyCityKey() || region;
+        const keyword = companyField.value.trim() || `${textValue(location.district)} 公司`.trim() || '公司';
         const searchUrl = new URL('https://uri.amap.com/search');
         searchUrl.search = new URLSearchParams({
           keyword, city, view: 'list', src: 'service-report', callnative: '0'
         });
         nearbyList.replaceChildren();
+
+        const history = companyHistoryForCurrentCity();
+        if (history.length) {
+          nearbyList.append(mobileElement('div', 'panel-message', `本机历史公司（${history.length} 条，优先显示当前城市）：`));
+          history.slice(0, 30).forEach(item => {
+            const button = mobileElement('button', 'nearby-choice');
+            button.type = 'button';
+            button.textContent = item.city ? `${item.name} · ${item.city}` : item.name;
+            button.addEventListener('click', () => selectHistoricalCompany(item));
+            nearbyList.append(button);
+          });
+        } else {
+          nearbyList.append(mobileElement('div', 'panel-message', '暂无本机公司历史。以后填写过的公司会自动保留在这里。'));
+        }
+
         const wrapper = document.createElement('div');
         wrapper.className = 'nearby-entry';
-        wrapper.innerHTML = '<p></p><label for="nearbyCompanyInput">公司名称</label><input id="nearbyCompanyInput" autocomplete="organization"><label for="nearbyAddressInput">公司地址</label><input id="nearbyAddressInput" autocomplete="street-address"><a class="nearby-map-link" target="_blank" rel="noopener">打开地图搜索</a><button class="nearby-apply" type="button">填入报告</button>';
-        wrapper.querySelector('p').textContent = `当前区域：${region || '未定位'}。地图搜索无需配置 Key；在地图中确认公司后，可在下方填写并一键带入报告。`;
+        wrapper.innerHTML = '<p></p><label for="nearbyCompanyInput">公司名称</label><input id="nearbyCompanyInput" autocomplete="organization"><label for="nearbyAddressInput">公司地址</label><input id="nearbyAddressInput" autocomplete="street-address"><a class="nearby-map-link" target="_blank" rel="noopener">打开地图搜索附近公司</a><button class="nearby-apply" type="button">填入报告并保存到历史</button>';
+        wrapper.querySelector('p').textContent = `当前区域：${region || '未定位'}。地图搜索无需 API Key；确认公司名称后可填入报告，并自动保存到本机历史。`;
         const nameInput = wrapper.querySelector('#nearbyCompanyInput');
         const addressInput = wrapper.querySelector('#nearbyAddressInput');
         nameInput.value = companyField.value;
@@ -3008,15 +3122,17 @@
         wrapper.querySelector('.nearby-apply').addEventListener('click', () => {
           companyField.value = nameInput.value.trim();
           addressField.value = addressInput.value.trim();
+          companyField.dispatchEvent(new Event('input', { bubbles: true }));
+          rememberCompanyHistory(companyField.value, addressField.value);
           scheduleLocalSave();
           syncMobileControlsFromReport();
           locationPanel.hidden = true;
-          locationStatus.textContent = companyField.value ? `已填入公司：${companyField.value}` : '公司信息可继续手动填写。';
+          locationStatus.textContent = companyField.value ? `已填入并保存公司历史：${companyField.value}` : '公司信息可继续手动填写。';
         });
+
         if (nearbyCompanies.length) {
-          const caption = mobileElement('div', 'nearby-entry', `附近公司地图标注（${nearbyCompanies.length} 条，点击选择）：`);
-          nearbyList.append(caption);
-          nearbyCompanies.forEach(item => {
+          nearbyList.append(mobileElement('div', 'panel-message', `本次联网取得的附近公司（${nearbyCompanies.length} 条）：`));
+          nearbyCompanies.slice(0, 40).forEach(item => {
             const button = mobileElement('button', 'nearby-choice');
             button.type = 'button';
             button.textContent = `${item.name} · 约 ${Math.round(item.distance)} 米`;
@@ -3024,37 +3140,38 @@
             nearbyList.append(button);
           });
         }
-        const search = mobileElement('button', 'nearby-apply', '获取精确位置并列出附近公司');
-        search.type = 'button';
-        search.addEventListener('click', async () => {
-          search.disabled = true;
-          search.textContent = '正在搜索附近公司…';
+
+        const online = mobileElement('button', 'nearby-apply', '尝试联网刷新附近公司（最多 5 秒）');
+        online.type = 'button';
+        online.addEventListener('click', async () => {
+          online.disabled = true;
+          online.textContent = '正在尝试联网查询…';
           try {
-            await loadNearbyCompanies({ requestPermission: true, force: true });
-            renderNearbySearch(cachedLocation || { province: '', city: '', district: '' });
-            if (!nearbyCompanies.length) {
-              nearbyList.prepend(mobileElement('div', 'panel-message', '地图暂未收录附近公司，请使用下方地图搜索或手动填写。'));
-            }
+            await Promise.race([
+              loadNearbyCompanies({ requestPermission: false, force: true }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('查询超时')), 5000))
+            ]);
+            renderNearbySearch(cachedLocation || location || { province: '', city: '', district: '' });
           } catch (error) {
-            search.disabled = false;
-            search.textContent = '重试附近公司搜索';
-            nearbyList.prepend(mobileElement('div', 'panel-message', `无法取得公司列表：${error.message}`));
+            online.disabled = false;
+            online.textContent = '联网不可用，可稍后重试';
+            nearbyList.prepend(mobileElement('div', 'panel-message', '联网公司数据源当前不可用，已停止等待；可直接使用本机历史或地图搜索。'));
           }
         });
-        nearbyList.append(search, wrapper);
+        nearbyList.append(online, wrapper);
       }
 
       async function openNearbyCompanies() {
         locationPanel.hidden = false;
-        nearbyList.innerHTML = '<div class="panel-message">正在识别城市和区县…</div>';
+        nearbyList.innerHTML = '<div class="panel-message">正在准备公司列表…</div>';
         try {
-          const location = await resolveLocation();
+          const location = cachedLocation || await resolveLocation();
           if (!addressField.value) addressField.value = displayRegion(location);
-          await loadNearbyCompanies({ requestPermission: false }).catch(error => console.warn('Nearby company discovery failed', error));
+          // 不自动联网查国外数据源；先立即显示本机历史和免 Key 地图入口。
           renderNearbySearch(location);
         } catch (error) {
-          renderNearbySearch({ city: addressField.value.trim(), district: '', province: '' });
-          locationStatus.textContent = `自动定位暂不可用：${error.message}；仍可免 Key 打开地图搜索。`;
+          renderNearbySearch({ city: currentCompanyCityKey() || addressField.value.trim(), district: '', province: '' });
+          locationStatus.textContent = `定位暂不可用：${error.message}；本机历史和免 Key 地图搜索仍可使用。`;
         }
       }
 
@@ -3656,6 +3773,7 @@
         } finally {
           restoringLocalState = false;
         }
+        rememberCompanyHistory(companyField.value, addressField.value);
         saveLocalState();
         const dateText = state.savedAt ? new Date(state.savedAt).toLocaleString('zh-CN') : '未知时间';
         locationStatus.textContent = imported ? `备份已导入；原保存时间：${dateText}` : `已恢复当前设备上 ${dateText} 保存的报告。`;
@@ -3748,7 +3866,8 @@
         saveLocalState();
         renderMobileEditor();
         syncMobileControlsFromReport();
-        locationStatus.textContent = '已清空本次报告数据和两处签字，并恢复上海、N/A 和故障排除等默认值；功能均保留。';
+        refreshCompanySuggestionDatalist();
+        locationStatus.textContent = '已清空本次报告数据和两处签字，并恢复默认值；公司历史下拉、日期/时间、定位、PDF 和离线功能均保留。';
         locateAddress({ quiet: true }).catch(() => {});
       }
 
@@ -3862,6 +3981,7 @@
       }
 
       document.getElementById('nearbyCompany').addEventListener('click', openNearbyCompanies);
+      companyField.addEventListener('blur', () => rememberCompanyHistory(companyField.value, addressField.value));
       document.getElementById('locateAddress').addEventListener('click', () => locateAddressPrecisely());
       document.getElementById('closeNearby').addEventListener('click', () => { locationPanel.hidden = true; });
       document.getElementById('closeInstall').addEventListener('click', () => { installPanel.hidden = true; });
@@ -4188,7 +4308,10 @@
         locationStatus.textContent = 'PDF 导出完成或已取消。地址与表格内容仍保留在当前页面。';
       });
 
-      window.addEventListener('pagehide', () => saveLocalState());
+      window.addEventListener('pagehide', () => {
+        rememberCompanyHistory(companyField.value, addressField.value);
+        saveLocalState();
+      });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') saveLocalState();
       });
@@ -4206,11 +4329,12 @@
       });
 
       restoreLocalState();
+      refreshCompanySuggestionDatalist();
       renderMobileEditor();
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V32';
+      const APP_BUILD = 'V33';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -4256,11 +4380,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=29', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=33', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V32'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V33'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V32';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V33';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
