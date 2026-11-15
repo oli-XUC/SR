@@ -1463,7 +1463,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V29</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V30</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -3031,16 +3031,34 @@
         renderMobileEditor();
       }
 
+      function dailyRowHasAnyUserData(row) {
+        if (!row) return false;
+        const names = ['work_date_', 'start_time_', 'end_time_', 'confirmation_'];
+        return names.some(prefix => {
+          const field = row.querySelector(`input[name^="${prefix}"]`);
+          return Boolean(field?.value?.trim());
+        });
+      }
+
       function removeDailyRow() {
         const rows = [...document.querySelectorAll('tr.daily')];
         if (rows.length <= MIN_DAILY_ROWS) {
-          locationStatus.textContent = '至少需要保留一个星期行。';
+          locationStatus.textContent = '至少需要保留一个工作日行。';
           return;
         }
-        rows.at(-1).remove();
+
+        // 只允许删除完全没有填写任何信息的工作日。
+        // 从最下面开始找空白行，避免误删已经填写的工作记录。
+        const removableRow = [...rows].reverse().find(row => !dailyRowHasAnyUserData(row));
+        if (!removableRow) {
+          locationStatus.textContent = '没有可删除的空白工作日；已填写信息的工作日会自动保留。';
+          return;
+        }
+
+        removableRow.remove();
         refreshDailyLayout();
         scheduleLocalSave();
-        locationStatus.textContent = `已删除最后一个星期行；当前共 ${rows.length - 1} 行，服务工作内容区域已自动增高。`;
+        locationStatus.textContent = `已删除一个空白工作日；已填写信息的工作日均已保留。当前共 ${rows.length - 1} 行。`;
         renderMobileEditor();
       }
 
@@ -4119,7 +4137,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V29';
+      const APP_BUILD = 'V30';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -4167,9 +4185,9 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./service-worker.js?v=29', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V29'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V30'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V29';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V30';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
