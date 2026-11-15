@@ -1185,6 +1185,32 @@
       font-size: 18px;
     }
 
+    /* Mobile order number: left prefix selector + right editable suffix. */
+    .nearby-dropdown-info { padding: 10px; color: #525a62; font-size: 12px; line-height: 1.45; }
+    .mobile-order-combo { display: flex; width: 100%; min-width: 0; gap: 7px; }
+    .mobile-order-prefix {
+      flex: 0 0 45%; width: 45%; min-width: 0; min-height: 44px;
+      border: 1px solid #b9bec4; border-radius: 8px;
+      padding: 6px 3px; background: #f5f6f7; color: #17191b;
+      font: 15px/1.35 -apple-system, "Microsoft YaHei", sans-serif;
+    }
+    .mobile-order-suffix { flex: 1 1 55%; min-width: 0; width: 55%; }
+    .mobile-daily-signature {
+      display: flex; align-items: center; gap: 10px; min-height: 42px;
+      padding: 5px 9px; margin: 3px 0 9px;
+      border: 1px solid #d5dadd; border-radius: 7px; color: #386046;
+      background: #f6fbf7; font-size: 12px;
+    }
+    .mobile-daily-signature img { width: 90px; max-height: 34px; object-fit: contain; }
+    /* Each working-day confirmation is the SAME signed PNG as the customer signature. */
+    tr.daily td.daily-confirmation-cell { position: relative; overflow: hidden; }
+    tr.daily .daily-confirmation-signature {
+      position: absolute; inset: 4% 3%; width: 94%; height: 92%;
+      display: block; object-fit: contain; pointer-events: none;
+    }
+    tr.daily .daily-confirmation-signature[hidden] { display: none !important; }
+    tr.daily input.daily-confirmation-with-signature { opacity: 0 !important; }
+
     .mobile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 10px; }
     .mobile-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .equipment-pair-grid,
@@ -1437,7 +1463,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V27</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V28</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -1453,7 +1479,7 @@
             <tr class="r1">
               <td class="label" colspan="3">公司名称 Company Name</td>
               <td class="field-cell" colspan="6">
-                <input class="field with-action" id="companyName" name="company_name" autocomplete="organization" aria-label="公司名称">
+                <input class="field with-action" id="companyName" name="company_name" list="nearbyCompanyOptions" autocomplete="organization" aria-label="公司名称">
                 <button class="cell-action" type="button" id="nearbyCompany">附近公司</button>
               </td>
             </tr>
@@ -1666,7 +1692,7 @@
   </main>
 
   <aside class="location-panel" id="locationPanel" hidden aria-live="polite">
-    <div class="panel-head"><strong>免 Key 附近公司搜索</strong><button type="button" id="closeNearby" aria-label="关闭">×</button></div>
+    <div class="panel-head"><strong>附近公司选择 · 地图查询</strong><button type="button" id="closeNearby" aria-label="关闭">×</button></div>
     <div class="nearby-list" id="nearbyList"><div class="panel-message">正在识别城市和区县…</div></div>
   </aside>
 
@@ -1734,6 +1760,7 @@
     </section>
   </div>
 
+  <datalist id="nearbyCompanyOptions"></datalist>
   <div class="compact-suggestions" id="supplierSuggestions" hidden role="listbox" aria-label="设备生产厂商选项"></div>
   <div class="compact-suggestions" id="naSuggestions" hidden role="listbox" aria-label="N/A 选项"><button type="button" role="option">N/A</button></div>
   <div class="compact-suggestions mobile-global-suggestions" id="globalSuggestions" hidden role="listbox" aria-label="当前字段选项"></div>
@@ -1839,6 +1866,28 @@
       const DEFAULT_NOTES_HEIGHT_MM = 36.66;
       const STORAGE_KEY = 'rieckermann-service-report-private-offline-v1';
       const BACKUP_KIND = 'rieckermann-service-report-backup';
+      const ORDER_PREFIXES = ['4PT', '4PK', '4PZ', '4F', '4E', '4H'];
+      const DEFAULT_REPORT_VALUES = Object.freeze({
+        departure_from: '上海',
+        return_to: '上海',
+        machine_type_2: 'N/A', serial_number_2: 'N/A',
+        machine_type_3: 'N/A', serial_number_3: 'N/A'
+      });
+
+      /* Defaults apply ONLY to a fresh/cleared report, never overwrite saved work. */
+      function applyReportDefaults() {
+        Object.entries(DEFAULT_REPORT_VALUES).forEach(([name, value]) => {
+          const field = reportField(name);
+          if (field) field.value = value;
+        });
+        const trouble = reportFields('service_type').find(field => field.value === '故障排除');
+        if (trouble) trouble.checked = true;
+      }
+
+      let lastPrecisePosition = null;
+      let nearbyCompanies = [];
+      let nearbyCompaniesPositionKey = '';
+      let nearbyCompaniesLoadedAt = 0;
 
       const pad = number => String(number).padStart(2, '0');
       const isoDate = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -1941,6 +1990,44 @@
         return label;
       }
 
+      function createMobileOrderField() {
+        const source = reportField('order_number');
+        if (!source) return null;
+        const label = mobileElement('label', 'mobile-field');
+        label.append(mobileElement('span', '', '合同号 Order Number'));
+        const combo = mobileElement('div', 'mobile-order-combo');
+        const prefix = document.createElement('select');
+        prefix.className = 'mobile-order-prefix';
+        prefix.dataset.orderPrefix = 'true';
+        prefix.setAttribute('aria-label', '合同号前缀');
+        prefix.append(new Option('前缀', ''));
+        ORDER_PREFIXES.forEach(code => prefix.append(new Option(code, code)));
+        const suffix = document.createElement('input');
+        suffix.className = 'mobile-control mobile-order-suffix';
+        suffix.dataset.orderSuffix = 'true';
+        suffix.autocomplete = 'off';
+        suffix.placeholder = '输入合同号';
+        suffix.setAttribute('aria-label', '合同号剩余部分');
+        const update = () => {
+          const full = source.value || '';
+          const code = ORDER_PREFIXES.find(item => full.startsWith(item)) || '';
+          prefix.value = code;
+          suffix.value = code ? full.slice(code.length) : full;
+        };
+        const commit = () => {
+          source.value = `${prefix.value}${suffix.value}`;
+          source.dispatchEvent(new Event('input', { bubbles: true }));
+          source.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        prefix.addEventListener('change', commit);
+        suffix.addEventListener('input', commit);
+        suffix.addEventListener('change', commit);
+        update();
+        combo.append(prefix, suffix);
+        label.append(combo);
+        return label;
+      }
+
       function createMobileCard(titleText) {
         const card = mobileElement('section', 'mobile-card');
         const title = mobileElement('h2', 'mobile-card-title', titleText);
@@ -1965,6 +2052,14 @@
           const source = reportField(control.dataset.sourceName);
           if (source && document.activeElement !== control) control.value = source.value || '';
         });
+        const orderPrefix = mobileEditor.querySelector('[data-order-prefix]');
+        const orderSuffix = mobileEditor.querySelector('[data-order-suffix]');
+        if (orderPrefix && orderSuffix && document.activeElement !== orderSuffix) {
+          const full = reportField('order_number')?.value || '';
+          const code = ORDER_PREFIXES.find(item => full.startsWith(item)) || '';
+          orderPrefix.value = code;
+          orderSuffix.value = code ? full.slice(code.length) : full;
+        }
         [['customer', 'mobileCustomerSignaturePreview'], ['company', 'mobileCompanySignaturePreview']].forEach(([party, previewId]) => {
           const config = signatureConfig(party);
           const preview = mobileEditor.querySelector(`#${previewId}`);
@@ -1991,7 +2086,7 @@
         customerActions.append(createMobileAction('附近公司', 'nearbyCompany'), createMobileAction('定位城市/区县', 'locateAddress'));
         customer.body.append(customerActions);
         appendMobileFields(customer.body, [
-          createMobileField('公司名称 Company Name', 'company_name'),
+          createMobileField('公司名称 Company Name', 'company_name', { list: 'nearbyCompanyOptions' }),
           createMobileField('公司地点 Company Address', 'company_address'),
           createMobileField('联系人姓名 Name', 'contact_name', { list: 'contactNAOptions' }),
           createMobileField('电子邮箱 Email', 'contact_email', { list: 'contactNAOptions' }),
@@ -2003,7 +2098,7 @@
         const equipment = createMobileCard('设备与服务 / Equipment & Service');
         const equipmentOrderSupplier = mobileElement('div', 'mobile-grid two equipment-top-pair-grid');
         appendMobileFields(equipmentOrderSupplier, [
-          createMobileField('合同号 Order Number', 'order_number'),
+          createMobileOrderField(),
           createMobileField('设备生产厂商 Supplier', 'supplier', { list: 'supplierOptions' })
         ]);
         const equipmentEngineers = mobileElement('div', 'mobile-grid two equipment-top-pair-grid');
@@ -2089,9 +2184,19 @@
             createMobileField('结束时间 End Time', `end_time_${id}`, { list: 'timeOptions' })
           ]);
           row.append(timePair);
-          appendMobileFields(row, [
-            createMobileField('客户签字确认 Customer Signature', `confirmation_${id}`)
-          ]);
+          if (customerSignatureData.value.startsWith('data:image/')) {
+            const signed = mobileElement('div', 'mobile-daily-signature');
+            signed.append(mobileElement('span', '', '客户签字确认 · 已同步签名'));
+            const preview = document.createElement('img');
+            preview.src = customerSignatureData.value;
+            preview.alt = '客户签名';
+            signed.append(preview);
+            row.append(signed);
+          } else {
+            appendMobileFields(row, [
+              createMobileField('客户签字确认 Customer Signature', `confirmation_${id}`)
+            ]);
+          }
           weeks.body.append(row);
         });
         mobileEditor.append(weeks.card);
@@ -2151,6 +2256,10 @@
 
       function renderGlobalSuggestions({ showAll = false } = {}) {
         if (!activeGlobalInput) return;
+        if (activeGlobalInput.dataset.listId === 'nearbyCompanyOptions') {
+          renderNearbyCompanyDropdown(activeGlobalInput, { showAll });
+          return;
+        }
         const query = showAll ? '' : activeGlobalInput.value.trim().toLocaleLowerCase();
         const options = datalistValues(activeGlobalInput).filter(value => !query || value.toLocaleLowerCase().includes(query));
         globalSuggestions.replaceChildren();
@@ -2178,6 +2287,15 @@
         closeCalendarPicker();
         activeGlobalInput = input;
         renderGlobalSuggestions({ showAll });
+        if (input.dataset.listId === 'nearbyCompanyOptions' && lastPrecisePosition && !nearbyCompaniesLoadedAt) {
+          loadNearbyCompanies().then(() => {
+            if (activeGlobalInput === input) renderNearbyCompanyDropdown(input, { showAll: true });
+          }).catch(error => {
+            if (activeGlobalInput === input) {
+              globalSuggestions.prepend(mobileElement('div', 'nearby-dropdown-info', `地图查询失败：${error.message}`));
+            }
+          });
+        }
       }
 
       function closeGlobalSuggestions() {
@@ -2374,7 +2492,7 @@
       function displayRegion(location) {
         const province = normalizeProvinceName(location.province);
         const city = normalizeCityName(location.city);
-        const district = textValue(location.district);
+        const district = validDistrict(location.district);
         return distinct([province, city, district]).join('.');
       }
 
@@ -2383,7 +2501,8 @@
         let score = 0;
         if (textValue(location.province)) score += 1;
         if (textValue(location.city)) score += 2;
-        if (textValue(location.district)) score += 4;
+        if (validDistrict(location.district)) score += 4;
+        if (location.coords) score += 100;
         return score;
       }
 
@@ -2489,46 +2608,89 @@
         return location;
       }
 
-      async function locateWithPreviouslyGrantedDevicePosition() {
+      async function devicePosition({ requestPermission = false } = {}) {
         if (!navigator.geolocation) throw new Error('当前浏览器不支持设备定位');
-        if (!navigator.permissions?.query) throw new Error('浏览器无法静默确认定位授权状态');
-
-        let permission;
-        try {
-          permission = await navigator.permissions.query({ name: 'geolocation' });
-        } catch (_) {
-          throw new Error('浏览器无法静默确认定位授权状态');
+        if (!requestPermission) {
+          if (!navigator.permissions?.query) throw new Error('无法确认是否已授权设备定位');
+          let permission;
+          try { permission = await navigator.permissions.query({ name: 'geolocation' }); }
+          catch (_) { throw new Error('无法静默查询定位授权'); }
+          if (permission.state !== 'granted') throw new Error('设备定位尚未授权');
         }
-        if (permission.state !== 'granted') {
-          throw new Error('设备定位尚未预先授权');
-        }
-
         const position = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 9000,
-            maximumAge: 300000
+            enableHighAccuracy: true, timeout: 14000, maximumAge: 120000
           });
         });
+        lastPrecisePosition = { lat: position.coords.latitude, lon: position.coords.longitude };
+        return lastPrecisePosition;
+      }
+
+      function validDistrict(value) {
+        const name = textValue(value).trim();
+        return /(区|县|旗)$/.test(name) && !/^(城区|市区|县区|地区)$/.test(name) ? name : '';
+      }
+
+      async function reversePrecisePosition(coords) {
         const query = new URLSearchParams({
-          latitude: String(position.coords.latitude),
-          longitude: String(position.coords.longitude),
-          localityLanguage: 'zh'
+          latitude: String(coords.lat), longitude: String(coords.lon), localityLanguage: 'zh'
         });
-        const data = await fetchJsonLocation(`https://api.bigdatacloud.net/data/reverse-geocode-client?${query.toString()}`, 8000);
-        const province = textValue(data?.principalSubdivision);
-        const city = textValue(data?.city) || textValue(data?.locality);
-        const administrative = Array.isArray(data?.localityInfo?.administrative)
-          ? data.localityInfo.administrative
-          : [];
-        const adminDistrict = administrative
-          .map(item => textValue(item?.name))
-          .find(name => name && name !== province && name !== city && /(区|县|旗)$/.test(name));
-        const locality = textValue(data?.locality);
-        const district = adminDistrict || ((locality && locality !== city && locality !== province && /(区|县|旗)$/.test(locality)) ? locality : '');
-        const location = { province, city, district, source: '已授权设备定位' };
-        if (!displayRegion(location)) throw new Error('设备定位未返回行政区信息');
+        let location = null;
+        try {
+          const data = await fetchJsonLocation(`https://api.bigdatacloud.net/data/reverse-geocode-client?${query}`, 8500);
+          const province = textValue(data?.principalSubdivision);
+          const city = textValue(data?.city) || textValue(data?.locality);
+          const administrative = Array.isArray(data?.localityInfo?.administrative) ? data.localityInfo.administrative : [];
+          const district = administrative.map(item => validDistrict(item?.name)).find(Boolean)
+            || validDistrict(data?.locality);
+          location = { province, city, district, source: '设备精确定位', coords };
+        } catch (error) { console.warn('First GPS reverse geocoder failed', error); }
+
+        // Second reverse geocoder only if the first service did not identify a district.
+        if (!location?.district) {
+          try {
+            const params = new URLSearchParams({
+              format: 'jsonv2', lat: String(coords.lat), lon: String(coords.lon),
+              zoom: '18', 'accept-language': 'zh-CN'
+            });
+            const data = await fetchJsonLocation(`https://nominatim.openstreetmap.org/reverse?${params}`, 9000);
+            const address = data?.address || {};
+            const second = {
+              province: textValue(address.state || address.province || address.region),
+              city: textValue(address.city || address.municipality || address.town),
+              district: validDistrict(address.city_district) || validDistrict(address.county)
+                || validDistrict(address.borough) || validDistrict(address.suburb),
+              source: '设备精确定位', coords
+            };
+            if (!location || locationScore(second) > locationScore(location)) location = second;
+          } catch (error) { console.warn('Second GPS reverse geocoder failed', error); }
+        }
+        if (!location || !displayRegion(location)) throw new Error('已取得 GPS 坐标，但地图服务未返回行政区');
         return location;
+      }
+
+      async function locateWithPreviouslyGrantedDevicePosition() {
+        const coords = await devicePosition({ requestPermission: false });
+        return reversePrecisePosition(coords);
+      }
+
+      async function locateAddressPrecisely() {
+        locationStatus.textContent = '正在获取设备精确位置，首次使用可能需要允许定位…';
+        try {
+          const coords = await devicePosition({ requestPermission: true });
+          const location = await reversePrecisePosition(coords);
+          cachedLocation = location;
+          addressField.value = displayRegion(location);
+          scheduleLocalSave();
+          syncMobileControlsFromReport();
+          locationStatus.textContent = location.district
+            ? `GPS 定位成功：${addressField.value}`
+            : `已获取 GPS 坐标，但地图服务未返回区县；可手动补充。`;
+          return location;
+        } catch (error) {
+          locationStatus.textContent = `精确定位未完成：${error.message}；可继续使用网络定位或手动输入。`;
+          return null;
+        }
       }
 
       async function resolveLocation({ force = false } = {}) {
@@ -2572,14 +2734,133 @@
             scheduleLocalSave();
             syncMobileControlsFromReport();
           }
-          locationStatus.textContent = textValue(location.district)
-            ? `已自动定位：${address}；内容可手动修改。`
-            : `已自动定位到省市：${address}；当前网络无法可靠识别区县，可手动补充。`;
+          locationStatus.textContent = location.coords
+            ? (validDistrict(location.district)
+                ? `已通过设备 GPS 定位：${address}；内容可手动修改。`
+                : `已获取设备 GPS 坐标：${address}；地图服务未返回区县，可手动补充。`)
+            : (validDistrict(location.district)
+                ? `网络定位估算：${address}；区县仅供参考，点击“定位城市/区县”可使用设备 GPS 核实。`
+                : `网络定位识别到：${address}；要精确到区县，请点击“定位城市/区县”并授权设备定位。`);
           return location;
         } catch (error) {
           locationStatus.textContent = `自动定位失败：${error.message}。地址仍可手动填写。`;
           throw error;
         }
+      }
+
+      function distanceMeters(a, b) {
+        const rad = degrees => degrees * Math.PI / 180;
+        const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat))
+          * Math.sin(dLon / 2) ** 2;
+        return 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+      }
+
+      async function loadNearbyCompanies({ requestPermission = false, force = false } = {}) {
+        const coords = lastPrecisePosition || await devicePosition({ requestPermission });
+        const key = `${coords.lat.toFixed(3)},${coords.lon.toFixed(3)}`;
+        if (!force && nearbyCompaniesPositionKey === key && Date.now() - nearbyCompaniesLoadedAt < 15 * 60 * 1000) {
+          return nearbyCompanies;
+        }
+        const query = `[out:json][timeout:14];(
+          nwr["office"]["name"](around:2500,${coords.lat},${coords.lon});
+          nwr["industrial"]["name"](around:2500,${coords.lat},${coords.lon});
+          nwr["craft"]["name"](around:2500,${coords.lat},${coords.lon});
+          nwr["building"="industrial"]["name"](around:2500,${coords.lat},${coords.lon});
+        );out center 150;`;
+        const endpoints = [
+          'https://overpass-api.de/api/interpreter',
+          'https://overpass.kumi.systems/api/interpreter'
+        ];
+        let data = null, lastError = null;
+        for (const endpoint of endpoints) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 12000);
+            try {
+              const response = await fetch(endpoint, {
+                method: 'POST', body: new URLSearchParams({ data: query }),
+                mode: 'cors', signal: controller.signal
+              });
+              if (!response.ok) throw new Error(`地图接口 HTTP ${response.status}`);
+              data = await response.json();
+            } finally { clearTimeout(timer); }
+            break;
+          } catch (error) { lastError = error; }
+        }
+        if (!data || !Array.isArray(data.elements)) {
+          throw new Error(`附近公司地图数据暂不可用：${lastError?.message || '无响应'}`);
+        }
+        const unique = new Map();
+        data.elements.forEach(item => {
+          const tags = item.tags || {};
+          const name = String(tags['name:zh'] || tags.name || '').trim();
+          const lat = Number(item.lat ?? item.center?.lat);
+          const lon = Number(item.lon ?? item.center?.lon);
+          if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+          const distance = distanceMeters(coords, { lat, lon });
+          if (!unique.has(name) || unique.get(name).distance > distance) {
+            unique.set(name, { name, distance, address: [tags['addr:city'], tags['addr:district'], tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join('') });
+          }
+        });
+        nearbyCompanies = [...unique.values()].sort((a, b) => a.distance - b.distance).slice(0, 80);
+        nearbyCompaniesPositionKey = key;
+        nearbyCompaniesLoadedAt = Date.now();
+        const datalist = document.getElementById('nearbyCompanyOptions');
+        datalist.replaceChildren(...nearbyCompanies.map(item => new Option(item.name, item.name)));
+        return nearbyCompanies;
+      }
+
+      function selectNearbyCompany(item) {
+        companyField.value = item.name;
+        companyField.dispatchEvent(new Event('input', { bubbles: true }));
+        scheduleLocalSave();
+        syncMobileControlsFromReport();
+        closeGlobalSuggestions();
+        locationPanel.hidden = true;
+        locationStatus.textContent = `已选择附近公司：${item.name}（地图标注，距离约 ${Math.round(item.distance)} 米）。`;
+      }
+
+      function renderNearbyCompanyDropdown(input, { showAll = false } = {}) {
+        if (!input) return;
+        globalSuggestions.replaceChildren();
+        const query = showAll ? '' : input.value.trim().toLocaleLowerCase();
+        const matches = nearbyCompanies.filter(item => !query || item.name.toLocaleLowerCase().includes(query));
+        if (matches.length) {
+          matches.forEach(item => {
+            const button = mobileElement('button', '', `${item.name} · 约 ${Math.round(item.distance)} 米`);
+            button.type = 'button';
+            button.addEventListener('pointerdown', event => event.preventDefault());
+            button.addEventListener('click', () => selectNearbyCompany(item));
+            globalSuggestions.append(button);
+          });
+        } else {
+          const info = mobileElement('div', 'nearby-dropdown-info', nearbyCompaniesLoadedAt
+            ? '当前位置附近没有找到匹配的公司，可手动输入。'
+            : '点击下方按钮搜索附近公司（需要定位和网络）。');
+          globalSuggestions.append(info);
+        }
+        const searchButton = mobileElement('button', '', '搜索/刷新附近公司');
+        searchButton.type = 'button';
+        searchButton.addEventListener('pointerdown', event => event.preventDefault());
+        searchButton.addEventListener('click', async () => {
+          globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', '正在查询附近公司的地图标注…'));
+          try {
+            const results = await loadNearbyCompanies({ requestPermission: true, force: true });
+            if (activeGlobalInput === input) {
+              renderNearbyCompanyDropdown(input, { showAll: true });
+              if (!results.length) locationStatus.textContent = '附近地图未收录公司，仍可手动填写或使用高德地图搜索。';
+            }
+          } catch (error) {
+            if (activeGlobalInput === input) {
+              globalSuggestions.replaceChildren(mobileElement('div', 'nearby-dropdown-info', `搜索失败：${error.message}。可手动输入或使用“附近公司”地图搜索。`));
+              positionGlobalSuggestions();
+            }
+          }
+        });
+        globalSuggestions.append(searchButton);
+        globalSuggestions.hidden = false;
+        positionGlobalSuggestions();
       }
 
       function renderNearbySearch(location) {
@@ -2608,7 +2889,35 @@
           locationPanel.hidden = true;
           locationStatus.textContent = companyField.value ? `已填入公司：${companyField.value}` : '公司信息可继续手动填写。';
         });
-        nearbyList.append(wrapper);
+        if (nearbyCompanies.length) {
+          const caption = mobileElement('div', 'nearby-entry', `附近公司地图标注（${nearbyCompanies.length} 条，点击选择）：`);
+          nearbyList.append(caption);
+          nearbyCompanies.forEach(item => {
+            const button = mobileElement('button', 'nearby-choice');
+            button.type = 'button';
+            button.textContent = `${item.name} · 约 ${Math.round(item.distance)} 米`;
+            button.addEventListener('click', () => selectNearbyCompany(item));
+            nearbyList.append(button);
+          });
+        }
+        const search = mobileElement('button', 'nearby-apply', '获取精确位置并列出附近公司');
+        search.type = 'button';
+        search.addEventListener('click', async () => {
+          search.disabled = true;
+          search.textContent = '正在搜索附近公司…';
+          try {
+            await loadNearbyCompanies({ requestPermission: true, force: true });
+            renderNearbySearch(cachedLocation || { province: '', city: '', district: '' });
+            if (!nearbyCompanies.length) {
+              nearbyList.prepend(mobileElement('div', 'panel-message', '地图暂未收录附近公司，请使用下方地图搜索或手动填写。'));
+            }
+          } catch (error) {
+            search.disabled = false;
+            search.textContent = '重试附近公司搜索';
+            nearbyList.prepend(mobileElement('div', 'panel-message', `无法取得公司列表：${error.message}`));
+          }
+        });
+        nearbyList.append(search, wrapper);
       }
 
       async function openNearbyCompanies() {
@@ -2617,6 +2926,9 @@
         try {
           const location = await resolveLocation();
           if (!addressField.value) addressField.value = displayRegion(location);
+          if (lastPrecisePosition) {
+            await loadNearbyCompanies().catch(error => console.warn('Nearby company discovery failed', error));
+          }
           renderNearbySearch(location);
         } catch (error) {
           renderNearbySearch({ city: addressField.value.trim(), district: '', province: '' });
@@ -2663,6 +2975,7 @@
         const row = createDailyRow(nextDailyRowId);
         nextDailyRowId += 1;
         document.getElementById('serviceDetailsRow').before(row);
+        syncDailyCustomerSignatures();
         refreshDailyLayout();
         scheduleLocalSave();
         locationStatus.textContent = `已添加星期行；当前共 ${count + 1} 行，服务工作内容区域已自动缩小。`;
@@ -3062,6 +3375,7 @@
         }
         closeSignaturePad();
         reviewSignaturePartyPending = null;
+        syncDailyCustomerSignatures();
         scheduleLocalSave();
         renderMobileEditor();
 
@@ -3126,6 +3440,33 @@
         refreshDailyLayout();
       }
 
+      function syncDailyCustomerSignatures() {
+        const dataUrl = customerSignatureData.value;
+        const signed = dataUrl.startsWith('data:image/');
+        document.querySelectorAll('tr.daily').forEach(row => {
+          const input = row.querySelector('input[name^="confirmation_"]');
+          if (!input) return;
+          const cell = input.closest('td');
+          if (!cell) return;
+          cell.classList.add('daily-confirmation-cell');
+          let image = cell.querySelector('.daily-confirmation-signature');
+          if (!image) {
+            image = document.createElement('img');
+            image.className = 'daily-confirmation-signature';
+            image.alt = '客户手写签字确认';
+            cell.append(image);
+          }
+          if (signed) {
+            if (image.src !== dataUrl) image.src = dataUrl;
+            image.hidden = false;
+          } else {
+            image.hidden = true;
+            image.removeAttribute('src');
+          }
+          input.classList.toggle('daily-confirmation-with-signature', signed);
+        });
+      }
+
       function renderStoredSignatures() {
         ['customer', 'company'].forEach(party => {
           const config = signatureConfig(party);
@@ -3141,6 +3482,7 @@
             config.launch.hidden = false;
           }
         });
+        syncDailyCustomerSignatures();
       }
 
       function applyLocalState(state, { imported = false } = {}) {
@@ -3174,8 +3516,10 @@
       function restoreLocalState() {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (!stored) {
+          applyReportDefaults();
+          saveLocalState();
           refreshDailyLayout();
-          locationStatus.textContent = 'HTTPS · PWA · OFFLINE READY：报告会自动保存在当前设备。';
+          locationStatus.textContent = '已载入新报告默认值；HTTPS · PWA · OFFLINE READY。';
           return false;
         }
         try {
@@ -3183,6 +3527,7 @@
           return true;
         } catch (error) {
           console.warn('Local report restore failed', error);
+          applyReportDefaults();
           refreshDailyLayout();
           locationStatus.textContent = '未能恢复旧数据；当前报告仍可正常填写。';
           return false;
@@ -3238,6 +3583,9 @@
           });
 
           cachedLocation = null;
+          nearbyCompanies = [];
+          nearbyCompaniesPositionKey = '';
+          applyReportDefaults();
           renderStoredSignatures();
           syncSignatureDateDisplays();
           refreshDailyLayout();
@@ -3251,7 +3599,8 @@
         saveLocalState();
         renderMobileEditor();
         syncMobileControlsFromReport();
-        locationStatus.textContent = '已清空当前报告全部表格数据和两处签字；原有功能均保留。';
+        locationStatus.textContent = '已清空本次报告数据和两处签字，并恢复上海、N/A 和故障排除等默认值；功能均保留。';
+        locateAddress({ quiet: true }).catch(() => {});
       }
 
       async function showInstallPrompt() {
@@ -3364,7 +3713,7 @@
       }
 
       document.getElementById('nearbyCompany').addEventListener('click', openNearbyCompanies);
-      document.getElementById('locateAddress').addEventListener('click', () => locateAddress({ force: true }).catch(() => {}));
+      document.getElementById('locateAddress').addEventListener('click', () => locateAddressPrecisely());
       document.getElementById('closeNearby').addEventListener('click', () => { locationPanel.hidden = true; });
       document.getElementById('closeInstall').addEventListener('click', () => { installPanel.hidden = true; });
       document.getElementById('installApp').addEventListener('click', showInstallPrompt);
@@ -3543,6 +3892,9 @@
       }
 
       async function generateMobilePdf({ purpose = 'final' } = {}) {
+        syncDailyCustomerSignatures();
+        const signedImages = [...reportPage.querySelectorAll('img.daily-confirmation-signature:not([hidden])')];
+        await Promise.all(signedImages.map(image => image.decode?.().catch(() => {}) || Promise.resolve()));
         const exportButton = document.getElementById('exportPdf');
         const firstDate = document.querySelector('.linked-date')?.value || isoDate(new Date());
         const companyNameForFile = safePdfFilePart(companyField?.value, '售后服务工作时间表');
@@ -3703,7 +4055,7 @@
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V27';
+      const APP_BUILD = 'V28';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -3749,11 +4101,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=27', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=28', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V27'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V28'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V27';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V28';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
