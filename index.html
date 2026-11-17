@@ -697,15 +697,48 @@
 
     .office-footer img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
+    .print-date-meta,
     .page-number {
       position: absolute;
-      top: 280.30mm;
-      left: 180.20mm;
-      width: 9.80mm;
-      height: 3.16mm;
-      font: 8pt/1 "Times New Roman", serif;
+      top: 290.05mm;
+      height: 3.2mm;
+      color: #000;
+      font: 7pt/1.1 Arial, "Microsoft YaHei", sans-serif;
       white-space: nowrap;
-      z-index: -1;
+      z-index: 4;
+    }
+
+    .print-date-meta {
+      left: 16.77mm;
+      text-align: left;
+    }
+
+    .print-date-meta strong { font-weight: 700; }
+
+    .page-number {
+      right: 14.87mm;
+      min-width: 18mm;
+      text-align: right;
+    }
+
+    .pdf-export-host {
+      position: absolute;
+      left: -10000px;
+      top: 0;
+      width: 210mm;
+      pointer-events: none;
+      background: #fff;
+    }
+
+    .pdf-export-host .sheet {
+      display: block !important;
+      position: relative !important;
+      width: 210mm !important;
+      height: 297mm !important;
+      margin: 0 !important;
+      overflow: hidden !important;
+      box-shadow: none !important;
+      transform: none !important;
     }
 
     .location-panel {
@@ -1053,18 +1086,28 @@
     }
     .pdf-review-zoom-controls .zoom-value { min-width: 64px; }
     .pdf-review-zoom-tip { color: #626970; font-size: 11px; white-space: nowrap; }
+    .pdf-review-pages {
+      display: block;
+      width: 100%;
+      max-width: none;
+      margin: 0 auto;
+      transform-origin: top left;
+    }
+
     .pdf-review-preview {
       display: block;
       width: 100%;
       max-width: none;
       height: auto;
-      margin: 0 auto;
+      margin: 0 auto 12px;
       background: #fff;
       box-shadow: 0 2px 14px rgba(0, 0, 0, .16);
       user-select: none;
       -webkit-user-select: none;
       -webkit-user-drag: none;
     }
+
+    .pdf-review-preview:last-child { margin-bottom: 0; }
 
     .pdf-review-actions {
       display: grid;
@@ -1216,12 +1259,20 @@
       border: 1px solid #d5dadd; border-radius: 7px; color: #386046;
       background: #f6fbf7; font-size: 12px;
     }
-    .mobile-daily-signature img { width: 90px; max-height: 34px; object-fit: contain; }
+    .mobile-daily-signature img { width: 58px; max-height: 34px; object-fit: contain; transform: scaleX(.82); }
     /* Each working-day confirmation is the SAME signed PNG as the customer signature. */
     tr.daily td.daily-confirmation-cell { position: relative; overflow: hidden; }
     tr.daily .daily-confirmation-signature {
-      position: absolute; inset: 4% 3%; width: 94%; height: 92%;
-      display: block; object-fit: contain; pointer-events: none;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 60%;
+      height: 88%;
+      display: block;
+      object-fit: contain;
+      transform: translate(-50%, -50%) scaleX(.82);
+      transform-origin: center center;
+      pointer-events: none;
     }
     tr.daily .daily-confirmation-signature[hidden] { display: none !important; }
     tr.daily input.daily-confirmation-with-signature { opacity: 0 !important; }
@@ -1297,7 +1348,16 @@
     }
 
     .mobile-week-row:last-child { margin-bottom: 0; }
-    .mobile-week-name { margin: 0 0 8px; color: #34383c; font-size: 13px; font-weight: 700; }
+    .mobile-week-row-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 8px;
+    }
+    .mobile-week-name { margin: 0; color: #34383c; font-size: 13px; font-weight: 700; }
+    .mobile-week-row-head .mobile-week-actions { flex: 0 0 auto; }
+    .mobile-week-row-head .mobile-week-actions button { min-width: 62px; }
     .mobile-signature-preview { display: block; width: min(34%, 145px); height: 78px; margin: 0 auto 8px; padding: 3px; object-fit: fill; border: 1px dashed #b8bdc2; border-radius: 8px; background: #fafafa; }
     .mobile-signature-preview[hidden] { display: none; }
     .mobile-signature-block + .mobile-signature-block { margin-top: 13px; padding-top: 13px; border-top: 1px solid #e5e7e9; }
@@ -1478,7 +1538,7 @@
     <button class="secondary" type="button" id="importBackup">导入备份</button>
     <button class="secondary" type="button" id="clearLocalData">清除缓存信息</button>
     <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
-    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V35</span>
+    <span class="private-badge" id="offlineBadge">PRIVATE · LOCAL · V36</span>
     <div class="toolbar-note"><span id="locationStatus">报告会自动保存在当前设备；首次安装完成后可关闭电脑并离线使用。</span></div>
   </div>
 
@@ -1627,43 +1687,43 @@
             <tr class="daily">
               <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_1" readonly aria-label="星期一行"></td>
               <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_1" data-weekday="weekday_1" list="dateOptions" aria-label="工作日期一" autocomplete="off"></td>
-              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_1" list="timeOptions" aria-label="开始时间一" autocomplete="off"></td>
-              <td class="field-cell"><input class="field time-input" name="end_time_1" list="timeOptions" aria-label="结束时间一" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_1" value="08:30" list="timeOptions" aria-label="开始时间一" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_1" value="17:00" list="timeOptions" aria-label="结束时间一" autocomplete="off"></td>
               <td class="field-cell"><input class="field" name="confirmation_1" aria-label="客户签字确认一"></td>
             </tr>
             <tr class="daily">
               <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_2" readonly aria-label="星期二行"></td>
               <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_2" data-weekday="weekday_2" list="dateOptions" aria-label="工作日期二" autocomplete="off"></td>
-              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_2" list="timeOptions" aria-label="开始时间二" autocomplete="off"></td>
-              <td class="field-cell"><input class="field time-input" name="end_time_2" list="timeOptions" aria-label="结束时间二" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_2" value="08:30" list="timeOptions" aria-label="开始时间二" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_2" value="17:00" list="timeOptions" aria-label="结束时间二" autocomplete="off"></td>
               <td class="field-cell"><input class="field" name="confirmation_2" aria-label="客户签字确认二"></td>
             </tr>
             <tr class="daily">
               <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_3" readonly aria-label="星期三行"></td>
               <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_3" data-weekday="weekday_3" list="dateOptions" aria-label="工作日期三" autocomplete="off"></td>
-              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_3" list="timeOptions" aria-label="开始时间三" autocomplete="off"></td>
-              <td class="field-cell"><input class="field time-input" name="end_time_3" list="timeOptions" aria-label="结束时间三" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_3" value="08:30" list="timeOptions" aria-label="开始时间三" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_3" value="17:00" list="timeOptions" aria-label="结束时间三" autocomplete="off"></td>
               <td class="field-cell"><input class="field" name="confirmation_3" aria-label="客户签字确认三"></td>
             </tr>
             <tr class="daily">
               <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_4" readonly aria-label="星期四行"></td>
               <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_4" data-weekday="weekday_4" list="dateOptions" aria-label="工作日期四" autocomplete="off"></td>
-              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_4" list="timeOptions" aria-label="开始时间四" autocomplete="off"></td>
-              <td class="field-cell"><input class="field time-input" name="end_time_4" list="timeOptions" aria-label="结束时间四" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_4" value="08:30" list="timeOptions" aria-label="开始时间四" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_4" value="17:00" list="timeOptions" aria-label="结束时间四" autocomplete="off"></td>
               <td class="field-cell"><input class="field" name="confirmation_4" aria-label="客户签字确认四"></td>
             </tr>
             <tr class="daily">
               <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_5" readonly aria-label="星期五行"></td>
               <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_5" data-weekday="weekday_5" list="dateOptions" aria-label="工作日期五" autocomplete="off"></td>
-              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_5" list="timeOptions" aria-label="开始时间五" autocomplete="off"></td>
-              <td class="field-cell"><input class="field time-input" name="end_time_5" list="timeOptions" aria-label="结束时间五" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_5" value="08:30" list="timeOptions" aria-label="开始时间五" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_5" value="17:00" list="timeOptions" aria-label="结束时间五" autocomplete="off"></td>
               <td class="field-cell"><input class="field" name="confirmation_5" aria-label="客户签字确认五"></td>
             </tr>
             <tr class="daily">
               <td class="field-cell" colspan="3"><input class="field weekday" name="weekday_6" readonly aria-label="星期六行"></td>
               <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_6" data-weekday="weekday_6" list="dateOptions" aria-label="工作日期六" autocomplete="off"></td>
-              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_6" list="timeOptions" aria-label="开始时间六" autocomplete="off"></td>
-              <td class="field-cell"><input class="field time-input" name="end_time_6" list="timeOptions" aria-label="结束时间六" autocomplete="off"></td>
+              <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_6" value="08:30" list="timeOptions" aria-label="开始时间六" autocomplete="off"></td>
+              <td class="field-cell"><input class="field time-input" name="end_time_6" value="17:00" list="timeOptions" aria-label="结束时间六" autocomplete="off"></td>
               <td class="field-cell"><input class="field" name="confirmation_6" aria-label="客户签字确认六"></td>
             </tr>
             <tr class="r20" id="serviceDetailsRow">
@@ -1702,7 +1762,8 @@
       <footer class="office-footer" aria-label="办事处联系方式">
         <img src="assets/customer-care-footer.png" alt="客户服务部及各办事处联系方式">
       </footer>
-      <div class="page-number">Page 1/1</div>
+      <div class="print-date-meta">print date_<strong id="printDateValue"></strong></div>
+      <div class="page-number">1 of 1</div>
     </section>
   </main>
 
@@ -1747,7 +1808,9 @@
           <button type="button" id="pdfReviewZoomIn" aria-label="放大预览">＋</button>
           <span class="pdf-review-zoom-tip">双指缩放</span>
         </div>
-        <img class="pdf-review-preview" id="customerPdfReviewImage" alt="完整 PDF 报告预览">
+        <div class="pdf-review-pages" id="customerPdfReviewPages">
+          <img class="pdf-review-preview" id="customerPdfReviewImage" alt="完整 PDF 报告预览">
+        </div>
       </div>
       <div class="pdf-review-sign-status" id="pdfReviewSignStatus">客户：未签字　公司：未签字</div>
       <div class="pdf-review-actions">
@@ -1808,6 +1871,7 @@
       const downloadGeneratedPdfButton = document.getElementById('downloadGeneratedPdf');
       const customerPdfReviewPanel = document.getElementById('customerPdfReviewPanel');
       const customerPdfReviewImage = document.getElementById('customerPdfReviewImage');
+      const customerPdfReviewPages = document.getElementById('customerPdfReviewPages');
       const customerPdfReviewScroll = document.getElementById('customerPdfReviewScroll');
       const pdfReviewZoomOutButton = document.getElementById('pdfReviewZoomOut');
       const pdfReviewZoomResetButton = document.getElementById('pdfReviewZoomReset');
@@ -1876,9 +1940,14 @@
 
       const DEFAULT_DAILY_ROWS = 6;
       const MIN_DAILY_ROWS = 1;
-      const MAX_DAILY_ROWS = 10;
+      const MAX_DAILY_ROWS = 30;
       const DAILY_ROW_HEIGHT_MM = 6.58;
-      const DEFAULT_NOTES_HEIGHT_MM = 36.66;
+      const DEFAULT_NOTES_HEIGHT_MM = 34.66;
+      const DEFAULT_START_TIME = '08:30';
+      const DEFAULT_END_TIME = '17:00';
+      const PDF_TABLE_MAX_HEIGHT_MM = 224.50;
+      const PDF_CONTINUATION_HEADER_HEIGHT_MM = 12.00;
+      const PDF_SIGNATURE_HEIGHT_MM = 27.69;
       const STORAGE_KEY = 'rieckermann-service-report-private-offline-v1';
       const BACKUP_KIND = 'rieckermann-service-report-backup';
       const COMPANY_HISTORY_KEY = 'rieckermann-service-report-company-history-v1';
@@ -2270,17 +2339,19 @@
         mobileEditor.append(travel.card);
 
         const weeks = createMobileCard('工作时间 / Working Time');
-        const weekActions = mobileElement('div', 'mobile-week-actions');
-        const addButton = mobileElement('button', '', '添加行');
-        const removeButton = mobileElement('button', '', '删除行');
-        addButton.type = removeButton.type = 'button';
-        addButton.addEventListener('click', addDailyRow);
-        removeButton.addEventListener('click', removeDailyRow);
-        weekActions.append(addButton, removeButton);
-        weeks.title.append(weekActions);
         dailyRowIds().forEach((id, index) => {
           const row = mobileElement('section', 'mobile-week-row');
-          row.append(mobileElement('div', 'mobile-week-name', `第 ${index + 1} 行 / Row ${index + 1}`));
+          const rowHead = mobileElement('div', 'mobile-week-row-head');
+          rowHead.append(mobileElement('div', 'mobile-week-name', `第 ${index + 1} 行 / Row ${index + 1}`));
+          const rowActions = mobileElement('div', 'mobile-week-actions');
+          const addButton = mobileElement('button', '', '添加行');
+          const removeButton = mobileElement('button', '', '删除行');
+          addButton.type = removeButton.type = 'button';
+          addButton.addEventListener('click', () => addDailyRowAfter(id));
+          removeButton.addEventListener('click', () => removeDailyRowById(id));
+          rowActions.append(addButton, removeButton);
+          rowHead.append(rowActions);
+          row.append(rowHead);
           const weekDatePair = mobileElement('div', 'mobile-grid two work-date-pair-grid');
           appendMobileFields(weekDatePair, [
             createMobileField('星期 Week', `weekday_${id}`, { readOnly: true }),
@@ -3196,7 +3267,7 @@
 
       function refreshDailyLayout() {
         const count = document.querySelectorAll('tr.daily').length;
-        const notesHeight = DEFAULT_NOTES_HEIGHT_MM + (DEFAULT_DAILY_ROWS - count) * DAILY_ROW_HEIGHT_MM;
+        const notesHeight = Math.max(8.0, DEFAULT_NOTES_HEIGHT_MM + (DEFAULT_DAILY_ROWS - count) * DAILY_ROW_HEIGHT_MM);
         document.getElementById('serviceDetailsRow').style.height = `${notesHeight.toFixed(2)}mm`;
         document.getElementById('addWeekRow').disabled = count >= MAX_DAILY_ROWS;
         document.getElementById('removeWeekRow').disabled = count <= MIN_DAILY_ROWS;
@@ -3208,8 +3279,8 @@
         row.dataset.rowId = String(id);
         row.innerHTML = `<td class="field-cell" colspan="3"><input class="field weekday" name="weekday_${id}" readonly aria-label="星期行 ${id}"></td>
           <td class="field-cell" colspan="2"><input class="field date-input linked-date" name="work_date_${id}" data-weekday="weekday_${id}" data-picker="calendar" aria-label="工作日期 ${id}" autocomplete="off"></td>
-          <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_${id}" list="timeOptions" aria-label="开始时间 ${id}" autocomplete="off"></td>
-          <td class="field-cell"><input class="field time-input" name="end_time_${id}" list="timeOptions" aria-label="结束时间 ${id}" autocomplete="off"></td>
+          <td class="field-cell" colspan="2"><input class="field time-input" name="start_time_${id}" value="${DEFAULT_START_TIME}" list="timeOptions" aria-label="开始时间 ${id}" autocomplete="off"></td>
+          <td class="field-cell"><input class="field time-input" name="end_time_${id}" value="${DEFAULT_END_TIME}" list="timeOptions" aria-label="结束时间 ${id}" autocomplete="off"></td>
           <td class="field-cell"><input class="field" name="confirmation_${id}" aria-label="客户签字确认 ${id}"></td>`;
         bindLinkedDate(row.querySelector('.linked-date'));
         return row;
@@ -3218,7 +3289,7 @@
       function addDailyRow() {
         const count = document.querySelectorAll('tr.daily').length;
         if (count >= MAX_DAILY_ROWS) {
-          locationStatus.textContent = `为保持一页 A4 版式，最多可保留 ${MAX_DAILY_ROWS} 个星期行。`;
+          locationStatus.textContent = `最多可保留 ${MAX_DAILY_ROWS} 个工作日；PDF 会自动分页。`;
           return;
         }
         const row = createDailyRow(nextDailyRowId);
@@ -3227,17 +3298,55 @@
         syncDailyCustomerSignatures();
         refreshDailyLayout();
         scheduleLocalSave();
-        locationStatus.textContent = `已添加星期行；当前共 ${count + 1} 行，服务工作内容区域已自动缩小。`;
+        locationStatus.textContent = `已添加工作日；当前共 ${count + 1} 行，PDF 会按内容自动分页。`;
         renderMobileEditor();
       }
 
       function dailyRowHasAnyUserData(row) {
         if (!row) return false;
-        const names = ['work_date_', 'start_time_', 'end_time_', 'confirmation_'];
-        return names.some(prefix => {
-          const field = row.querySelector(`input[name^="${prefix}"]`);
-          return Boolean(field?.value?.trim());
-        });
+        const date = row.querySelector('input[name^="work_date_"]')?.value?.trim() || '';
+        const start = row.querySelector('input[name^="start_time_"]')?.value?.trim() || '';
+        const end = row.querySelector('input[name^="end_time_"]')?.value?.trim() || '';
+        const confirmation = row.querySelector('input[name^="confirmation_"]')?.value?.trim() || '';
+        return Boolean(date || confirmation || (start && start !== DEFAULT_START_TIME) || (end && end !== DEFAULT_END_TIME));
+      }
+
+      function addDailyRowAfter(rowId) {
+        const count = document.querySelectorAll('tr.daily').length;
+        if (count >= MAX_DAILY_ROWS) {
+          locationStatus.textContent = `最多可保留 ${MAX_DAILY_ROWS} 个工作日；PDF 会自动分页。`;
+          return;
+        }
+        const anchor = [...document.querySelectorAll('tr.daily')]
+          .find(row => Number(row.dataset.rowId) === Number(rowId));
+        const row = createDailyRow(nextDailyRowId);
+        nextDailyRowId += 1;
+        if (anchor) anchor.after(row);
+        else document.getElementById('serviceDetailsRow').before(row);
+        syncDailyCustomerSignatures();
+        refreshDailyLayout();
+        scheduleLocalSave();
+        renderMobileEditor();
+        locationStatus.textContent = '已在当前工作日后添加一行；PDF 将按内容自动分页。';
+      }
+
+      function removeDailyRowById(rowId) {
+        const rows = [...document.querySelectorAll('tr.daily')];
+        if (rows.length <= MIN_DAILY_ROWS) {
+          locationStatus.textContent = '至少需要保留一个工作日行。';
+          return;
+        }
+        const row = rows.find(item => Number(item.dataset.rowId) === Number(rowId));
+        if (!row) return;
+        if (dailyRowHasAnyUserData(row)) {
+          locationStatus.textContent = '该工作日已有输入信息，已保留；只能删除未输入信息的工作日。';
+          return;
+        }
+        row.remove();
+        refreshDailyLayout();
+        scheduleLocalSave();
+        renderMobileEditor();
+        locationStatus.textContent = '已删除当前空白工作日；已填写信息的工作日不会被删除。';
       }
 
       function removeDailyRow() {
@@ -3579,7 +3688,7 @@
           ? (scroller.scrollTop + scroller.clientHeight / 2) / scroller.scrollHeight
           : 0;
         pdfReviewZoom = nextZoom;
-        customerPdfReviewImage.style.width = `${(pdfReviewZoom * 100).toFixed(1)}%`;
+        customerPdfReviewPages.style.width = `${(pdfReviewZoom * 100).toFixed(1)}%`;
         updatePdfReviewZoomLabel();
         if (preserveCenter) {
           requestAnimationFrame(() => {
@@ -3591,7 +3700,7 @@
 
       function resetPdfReviewZoom() {
         pdfReviewZoom = 1;
-        customerPdfReviewImage.style.width = '100%';
+        customerPdfReviewPages.style.width = '100%';
         updatePdfReviewZoomLabel();
         customerPdfReviewScroll.scrollLeft = 0;
       }
@@ -3603,12 +3712,27 @@
         return Math.hypot(dx, dy);
       }
 
+      function renderPdfReviewPages(generated) {
+        const urls = Array.isArray(generated?.previewImageUrls) && generated.previewImageUrls.length
+          ? generated.previewImageUrls
+          : (generated?.previewImageUrl ? [generated.previewImageUrl] : []);
+        customerPdfReviewPages.replaceChildren();
+        urls.forEach((url, index) => {
+          const image = document.createElement('img');
+          image.className = 'pdf-review-preview';
+          image.alt = `PDF 报告预览第 ${index + 1} 页`;
+          image.src = url;
+          if (index === 0) image.id = 'customerPdfReviewImage';
+          customerPdfReviewPages.append(image);
+        });
+      }
+
       async function refreshSignatureReviewPdf() {
         locationStatus.textContent = '正在更新签字后的完整 PDF 预览…';
         const reviewPdf = await generateMobilePdf({ purpose: 'review' });
         if (!reviewPdf) return;
         latestCustomerReviewPdf = reviewPdf;
-        customerPdfReviewImage.src = reviewPdf.previewImageUrl;
+        renderPdfReviewPages(reviewPdf);
         customerPdfReviewScroll.scrollTop = 0;
         updateReviewSignatureState();
         customerPdfReviewPanel.hidden = false;
@@ -3657,6 +3781,15 @@
           const linkedDate = row.querySelector('.linked-date');
           const match = linkedDate?.name?.match(/_(\d+)$/);
           return match ? Number(match[1]) : index + 1;
+        });
+      }
+
+      function ensureDailyTimeDefaults() {
+        document.querySelectorAll('tr.daily').forEach(row => {
+          const start = row.querySelector('input[name^="start_time_"]');
+          const end = row.querySelector('input[name^="end_time_"]');
+          if (start && !start.value.trim()) start.value = DEFAULT_START_TIME;
+          if (end && !end.value.trim()) end.value = DEFAULT_END_TIME;
         });
       }
 
@@ -3709,10 +3842,10 @@
 
       function dailyRowHasEnteredInfo(row) {
         if (!row) return false;
-        return ['work_date_', 'start_time_', 'end_time_'].some(prefix => {
-          const field = row.querySelector(`input[name^="${prefix}"]`);
-          return Boolean(field?.value?.trim());
-        });
+        const date = row.querySelector('input[name^="work_date_"]')?.value?.trim() || '';
+        const start = row.querySelector('input[name^="start_time_"]')?.value?.trim() || '';
+        const end = row.querySelector('input[name^="end_time_"]')?.value?.trim() || '';
+        return Boolean(date || (start && start !== DEFAULT_START_TIME) || (end && end !== DEFAULT_END_TIME));
       }
 
       function syncDailyCustomerSignatures() {
@@ -3777,6 +3910,7 @@
             if ('checked' in element && typeof record.checked === 'boolean') element.checked = record.checked;
             if (typeof record.value === 'string') element.value = record.value;
           });
+          ensureDailyTimeDefaults();
           document.querySelectorAll('.linked-date').forEach(syncWeekday);
           renderStoredSignatures();
           refreshDailyLayout();
@@ -3794,6 +3928,7 @@
         const stored = localStorage.getItem(STORAGE_KEY);
         if (!stored) {
           applyReportDefaults();
+          ensureDailyTimeDefaults();
           saveLocalState();
           refreshDailyLayout();
           locationStatus.textContent = '已载入新报告默认值；HTTPS · PWA · OFFLINE READY。';
@@ -3805,6 +3940,7 @@
         } catch (error) {
           console.warn('Local report restore failed', error);
           applyReportDefaults();
+          ensureDailyTimeDefaults();
           refreshDailyLayout();
           locationStatus.textContent = '未能恢复旧数据；当前报告仍可正常填写。';
           return false;
@@ -3843,7 +3979,7 @@
         customerPdfReviewPanel.hidden = true;
         document.body.classList.remove('pdf-review-open');
         latestCustomerReviewPdf = null;
-        customerPdfReviewImage.removeAttribute('src');
+        customerPdfReviewPages.replaceChildren();
 
         restoringLocalState = true;
         try {
@@ -3863,6 +3999,7 @@
           nearbyCompanies = [];
           nearbyCompaniesPositionKey = '';
           applyReportDefaults();
+          ensureDailyTimeDefaults();
           renderStoredSignatures();
           syncSignatureDateDisplays();
           refreshDailyLayout();
@@ -3910,7 +4047,7 @@
         const reviewPdf = await generateMobilePdf({ purpose: 'review' });
         if (!reviewPdf) return;
         latestCustomerReviewPdf = reviewPdf;
-        customerPdfReviewImage.src = reviewPdf.previewImageUrl;
+        renderPdfReviewPages(reviewPdf);
         resetPdfReviewZoom();
         customerPdfReviewScroll.scrollTop = 0;
         updateReviewSignatureState();
@@ -4176,6 +4313,260 @@
         return cleaned || fallback;
       }
 
+      function updateBasePdfMeta() {
+        const dateValue = document.getElementById('printDateValue');
+        if (dateValue) dateValue.textContent = isoDate(new Date());
+        const pageNumber = reportPage.querySelector('.page-number');
+        if (pageNumber) pageNumber.textContent = '1 of 1';
+      }
+
+      function reportRowHeightMm(row) {
+        if (!row) return 0;
+        if (row.classList.contains('daily')) return DAILY_ROW_HEIGHT_MM;
+        const heights = {
+          r1: 8.03, r2: 7.99, r3: 7.73, r4: 7.80, r5: 10.64,
+          r6: 7.81, r7: 8.50, r8: 8.50, r9: 17.00, r10: 10.60,
+          r11: 8.03, r12: 7.97, r13: 12.00, r20: DEFAULT_NOTES_HEIGHT_MM,
+          r21: PDF_SIGNATURE_HEIGHT_MM
+        };
+        for (const [name, height] of Object.entries(heights)) {
+          if (row.classList.contains(name)) return height;
+        }
+        return 0;
+      }
+
+      function measureNotesHeightMm(text, { minimum = 10 } = {}) {
+        const probe = document.createElement('div');
+        probe.style.cssText = [
+          'position:absolute','left:-10000px','top:0','width:178.36mm','box-sizing:border-box',
+          'padding:2.2mm','font:9.5pt/1.42 Arial,Microsoft YaHei,sans-serif','white-space:pre-wrap',
+          'overflow-wrap:anywhere','word-break:break-word','visibility:hidden'
+        ].join(';');
+        probe.textContent = text || ' ';
+        document.body.append(probe);
+        const mm = probe.getBoundingClientRect().height / (96 / 25.4);
+        probe.remove();
+        return Math.max(minimum, mm + .8);
+      }
+
+      function splitNotesTextForHeight(text, maxHeightMm) {
+        const source = String(text || '');
+        if (!source) return { head: '', tail: '' };
+        let low = 1;
+        let high = source.length;
+        let best = 1;
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          const candidate = source.slice(0, mid);
+          if (measureNotesHeightMm(candidate, { minimum: 0 }) <= maxHeightMm) {
+            best = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+        if (best < source.length) {
+          const preferred = Math.max(
+            source.lastIndexOf('\n', best),
+            source.lastIndexOf(' ', best),
+            source.lastIndexOf('，', best),
+            source.lastIndexOf('。', best),
+            source.lastIndexOf('；', best)
+          );
+          if (preferred > Math.max(1, Math.floor(best * .65))) best = preferred + 1;
+        }
+        return { head: source.slice(0, best), tail: source.slice(best) };
+      }
+
+      function buildPdfPagePlans() {
+        const tbody = reportPage.querySelector('.report-table tbody');
+        const allRows = [...tbody.children];
+        const staticRows = allRows.filter(row => {
+          if (row.classList.contains('daily') || row.id === 'serviceDetailsRow' || row.classList.contains('r21')) return false;
+          return true;
+        });
+        const dailyRows = allRows.filter(row => row.classList.contains('daily'));
+        const workHeader = allRows.find(row => row.classList.contains('r13'));
+        const notesRow = document.getElementById('serviceDetailsRow');
+        const signatureRow = allRows.find(row => row.classList.contains('r21'));
+        const serviceText = reportField('service_details')?.value || '';
+
+        const pages = [];
+        const makePage = () => ({ items: [], height: 0 });
+        let page = makePage();
+        pages.push(page);
+        staticRows.forEach(row => {
+          const height = reportRowHeightMm(row);
+          page.items.push({ row, height });
+          page.height += height;
+        });
+
+        const startDailyContinuation = () => {
+          page = makePage();
+          pages.push(page);
+          if (workHeader) {
+            page.items.push({ row: workHeader, height: PDF_CONTINUATION_HEADER_HEIGHT_MM, repeat: true });
+            page.height += PDF_CONTINUATION_HEADER_HEIGHT_MM;
+          }
+        };
+
+        dailyRows.forEach(row => {
+          if (page.height + DAILY_ROW_HEIGHT_MM > PDF_TABLE_MAX_HEIGHT_MM) startDailyContinuation();
+          page.items.push({ row, height: DAILY_ROW_HEIGHT_MM });
+          page.height += DAILY_ROW_HEIGHT_MM;
+        });
+
+        let notesRemaining = serviceText;
+        let fullNotesHeight = Math.max(DEFAULT_NOTES_HEIGHT_MM, measureNotesHeightMm(notesRemaining, { minimum: DEFAULT_NOTES_HEIGHT_MM }));
+        const remainingOnCurrent = PDF_TABLE_MAX_HEIGHT_MM - page.height;
+
+        if (fullNotesHeight + PDF_SIGNATURE_HEIGHT_MM <= remainingOnCurrent + .15) {
+          page.items.push({ row: notesRow, height: fullNotesHeight, notesText: notesRemaining });
+          page.height += fullNotesHeight;
+          page.items.push({ row: signatureRow, height: PDF_SIGNATURE_HEIGHT_MM });
+          page.height += PDF_SIGNATURE_HEIGHT_MM;
+          return pages;
+        }
+
+        // Keep the service-details block together when possible; move it to the next page
+        // rather than squeezing it into a tiny remainder at the bottom of page 1.
+        page = makePage();
+        pages.push(page);
+
+        while (notesRemaining) {
+          const availableWithSignature = PDF_TABLE_MAX_HEIGHT_MM - page.height - PDF_SIGNATURE_HEIGHT_MM;
+          const remainingNatural = measureNotesHeightMm(notesRemaining, { minimum: DEFAULT_NOTES_HEIGHT_MM });
+          if (remainingNatural <= availableWithSignature + .15) {
+            const noteHeight = Math.max(DEFAULT_NOTES_HEIGHT_MM, remainingNatural);
+            page.items.push({ row: notesRow, height: noteHeight, notesText: notesRemaining });
+            page.height += noteHeight;
+            notesRemaining = '';
+            break;
+          }
+
+          const maxChunkHeight = PDF_TABLE_MAX_HEIGHT_MM - page.height;
+          if (maxChunkHeight < 20) {
+            page = makePage();
+            pages.push(page);
+            continue;
+          }
+          const chunk = splitNotesTextForHeight(notesRemaining, maxChunkHeight - 1);
+          const chunkText = chunk.head || notesRemaining.slice(0, 1);
+          const chunkHeight = Math.min(maxChunkHeight, Math.max(12, measureNotesHeightMm(chunkText, { minimum: 12 })));
+          page.items.push({ row: notesRow, height: chunkHeight, notesText: chunkText, continuation: true });
+          page.height += chunkHeight;
+          notesRemaining = chunk.tail || notesRemaining.slice(chunkText.length);
+          if (notesRemaining) {
+            page = makePage();
+            pages.push(page);
+          }
+        }
+
+        if (!serviceText) {
+          const noteHeight = DEFAULT_NOTES_HEIGHT_MM;
+          if (page.height + noteHeight + PDF_SIGNATURE_HEIGHT_MM > PDF_TABLE_MAX_HEIGHT_MM) {
+            page = makePage();
+            pages.push(page);
+          }
+          page.items.push({ row: notesRow, height: noteHeight, notesText: '' });
+          page.height += noteHeight;
+        }
+
+        if (page.height + PDF_SIGNATURE_HEIGHT_MM > PDF_TABLE_MAX_HEIGHT_MM) {
+          page = makePage();
+          pages.push(page);
+        }
+        page.items.push({ row: signatureRow, height: PDF_SIGNATURE_HEIGHT_MM });
+        page.height += PDF_SIGNATURE_HEIGHT_MM;
+        return pages.filter(item => item.items.length);
+      }
+
+      function syncClonedControls(source, clone) {
+        const sourceControls = source.querySelectorAll('input, textarea, select');
+        const cloneControls = clone.querySelectorAll('input, textarea, select');
+        sourceControls.forEach((control, index) => {
+          const target = cloneControls[index];
+          if (!target) return;
+          if ('checked' in control) target.checked = control.checked;
+          if ('value' in control) target.value = control.value;
+        });
+      }
+
+      function makePdfRowClone(item, doc) {
+        const clone = item.row.cloneNode(true);
+        syncClonedControls(item.row, clone);
+        clone.style.height = `${item.height.toFixed(2)}mm`;
+        if (item.row.id === 'serviceDetailsRow' || item.row.classList.contains('r20')) {
+          clone.removeAttribute('id');
+          const textarea = clone.querySelector('.notes-field');
+          if (textarea) {
+            const mirror = doc.createElement('div');
+            mirror.className = 'field notes-field';
+            mirror.textContent = item.notesText ?? '';
+            mirror.style.cssText = 'display:block;width:100%;height:100%;box-sizing:border-box;padding:2.2mm;font-size:9.5pt;line-height:1.42;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow:hidden;color:#000;background:transparent;';
+            textarea.replaceWith(mirror);
+          }
+        }
+        return clone;
+      }
+
+      function buildPdfPageElement(plan, pageIndex, totalPages) {
+        const page = reportPage.cloneNode(true);
+        page.removeAttribute('id');
+        page.classList.add('pdf-generated-page');
+        page.style.display = 'block';
+        page.style.position = 'relative';
+        page.style.margin = '0';
+        page.style.boxShadow = 'none';
+        page.style.transform = 'none';
+        const table = page.querySelector('table.report-table');
+        const tbody = table.querySelector('tbody');
+        tbody.replaceChildren(...plan.items.map(item => makePdfRowClone(item, page.ownerDocument)));
+        table.style.height = `${Math.max(1, plan.height).toFixed(2)}mm`;
+        const tableWrap = page.querySelector('.table-wrap');
+        tableWrap.style.height = `${Math.max(1, plan.height).toFixed(2)}mm`;
+        page.querySelectorAll('.cell-action, .signature-launch').forEach(element => element.remove());
+        const printMeta = page.querySelector('.print-date-meta');
+        if (printMeta) printMeta.innerHTML = `print date_<strong>${isoDate(new Date())}</strong>`;
+        const pageNumber = page.querySelector('.page-number');
+        if (pageNumber) pageNumber.textContent = `${pageIndex + 1} of ${totalPages}`;
+        return page;
+      }
+
+      async function renderPdfPagesToImages(scale) {
+        const plans = buildPdfPagePlans();
+        const host = document.createElement('div');
+        host.className = 'pdf-export-host';
+        document.body.append(host);
+        const urls = [];
+        try {
+          for (let index = 0; index < plans.length; index += 1) {
+            const page = buildPdfPageElement(plans[index], index, plans.length);
+            host.replaceChildren(page);
+            await Promise.all([...page.querySelectorAll('img')].map(image => image.decode?.().catch(() => {}) || Promise.resolve()));
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const canvas = await withTimeout(window.html2canvas(page, {
+              scale,
+              backgroundColor: '#ffffff',
+              useCORS: true,
+              logging: false,
+              width: Math.ceil(page.offsetWidth),
+              height: Math.ceil(page.offsetHeight),
+              windowWidth: Math.max(1200, Math.ceil(page.offsetWidth) + 120),
+              windowHeight: Math.max(1400, Math.ceil(page.offsetHeight) + 120),
+              scrollX: 0,
+              scrollY: 0
+            }), 45000, `第 ${index + 1} 页绘制超时，请关闭其他应用后重试`);
+            urls.push(canvas.toDataURL('image/png'));
+            canvas.width = 1;
+            canvas.height = 1;
+          }
+        } finally {
+          host.remove();
+        }
+        return urls;
+      }
+
       async function generateMobilePdf({ purpose = 'final' } = {}) {
         syncDailyCustomerSignatures();
         const signedImages = [...reportPage.querySelectorAll('img.daily-confirmation-signature:not([hidden])')];
@@ -4199,62 +4590,12 @@
             await withTimeout(document.fonts.ready, 2500, '字体准备超时').catch(() => {});
           }
           await new Promise(resolve => setTimeout(resolve, 80));
-          locationStatus.textContent = '正在生成 PDF（2/3）：绘制报告表格…';
-          const scale = isIOS ? 3.60 : Math.min(3.6, Math.max(2.8, (window.devicePixelRatio || 2) * 1.15));
-          const renderWidth = Math.ceil(reportPage.offsetWidth);
-          const renderHeight = Math.ceil(reportPage.offsetHeight);
-          const captureViewportWidth = Math.max(1200, renderWidth + 120);
-          const captureViewportHeight = Math.max(1400, renderHeight + 120);
-          const serviceDetailsValue = reportField('service_details')?.value || '';
-          const canvas = await withTimeout(window.html2canvas(reportPage, {
-            scale,
-            backgroundColor: '#ffffff',
-            useCORS: true,
-            logging: false,
-            width: renderWidth,
-            height: renderHeight,
-            windowWidth: captureViewportWidth,
-            windowHeight: captureViewportHeight,
-            scrollX: 0,
-            scrollY: 0,
-            onclone: clonedDocument => {
-              clonedDocument.body.classList.add('pdf-rendering');
-              const clonedPage = clonedDocument.getElementById('reportPage');
-              if (clonedPage) {
-                clonedPage.style.display = 'block';
-                clonedPage.style.position = 'relative';
-                clonedPage.style.top = '0';
-                clonedPage.style.left = '0';
-                clonedPage.style.margin = '0';
-                clonedPage.style.transform = 'none';
-                clonedPage.style.boxShadow = 'none';
-
-                /* html2canvas on iOS can flatten a textarea into one long line.
-                   Replace only the PDF clone with a normal block so manual line breaks
-                   and automatic wrapping are preserved exactly in the report. */
-                const clonedNotes = clonedPage.querySelector('.notes-field');
-                if (clonedNotes) {
-                  const notesMirror = clonedDocument.createElement('div');
-                  notesMirror.className = 'field notes-field';
-                  notesMirror.textContent = serviceDetailsValue;
-                  notesMirror.style.display = 'block';
-                  notesMirror.style.width = '100%';
-                  notesMirror.style.height = '100%';
-                  notesMirror.style.padding = '2.2mm';
-                  notesMirror.style.fontSize = '9.5pt';
-                  notesMirror.style.lineHeight = '1.42';
-                  notesMirror.style.whiteSpace = 'pre-wrap';
-                  notesMirror.style.overflowWrap = 'anywhere';
-                  notesMirror.style.wordBreak = 'break-word';
-                  notesMirror.style.overflow = 'hidden';
-                  notesMirror.style.color = '#000';
-                  notesMirror.style.background = 'transparent';
-                  clonedNotes.replaceWith(notesMirror);
-                }
-              }
-            }
-          }), 45000, '报告绘制超时，请关闭其他应用后重试');
-          locationStatus.textContent = '正在生成 PDF（3/3）：封装单页 A4 文件…';
+          updateBasePdfMeta();
+          locationStatus.textContent = '正在生成 PDF（2/3）：自动分页并绘制报告…';
+          const scale = isIOS ? 3.15 : Math.min(3.4, Math.max(2.7, (window.devicePixelRatio || 2) * 1.10));
+          const previewImageUrls = await renderPdfPagesToImages(scale);
+          if (!previewImageUrls.length) throw new Error('未生成任何 PDF 页面');
+          locationStatus.textContent = `正在生成 PDF（3/3）：封装 ${previewImageUrls.length} 页 A4 文件…`;
           const { jsPDF } = window.jspdf;
           const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
           pdf.setProperties({
@@ -4262,13 +4603,16 @@
             subject: '售后服务工作时间表/报告',
             creator: 'Private Offline Service Report PWA'
           });
-          const previewImageUrl = canvas.toDataURL('image/png');
-          pdf.addImage(previewImageUrl, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+          previewImageUrls.forEach((imageUrl, index) => {
+            if (index > 0) pdf.addPage('a4', 'portrait');
+            pdf.addImage(imageUrl, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+          });
+          const previewImageUrl = previewImageUrls[0];
           const blob = pdf.output('blob');
           window.__lastGeneratedPdfBlob = blob;
           const { pdfUrl, blobUrl, cached } = await publishGeneratedPdf(blob, fileName);
           window.__lastGeneratedPdfUrl = pdfUrl;
-          const generated = { blob, pdfUrl, blobUrl, fileName, cached, previewImageUrl };
+          const generated = { blob, pdfUrl, blobUrl, fileName, cached, previewImageUrl, previewImageUrls };
 
           if (purpose === 'review') {
             latestCustomerReviewPdf = generated;
@@ -4338,13 +4682,14 @@
         }
       });
 
+      updateBasePdfMeta();
       restoreLocalState();
       refreshCompanySuggestionDatalist();
       renderMobileEditor();
       setTimeout(() => locateAddress({ quiet: true, force: true }).catch(() => {}), 450);
 
       const isCodespacesDev = location.hostname.endsWith('.app.github.dev');
-      const APP_BUILD = 'V35';
+      const APP_BUILD = 'V36';
       const APP_BUILD_KEY = 'service-report-app-build';
 
       async function refreshAppCacheForNewBuild() {
@@ -4390,11 +4735,11 @@
         });
       } else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?v=34', { updateViaCache: 'none' })
+          navigator.serviceWorker.register('./service-worker.js?v=36', { updateViaCache: 'none' })
             .then(() => navigator.serviceWorker.ready)
-            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V35'; })
+            .then(() => { offlineBadge.textContent = 'GITHUB · HTTPS · OFFLINE READY · V36'; })
             .catch(() => {
-              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V35';
+              offlineBadge.textContent = 'GITHUB · HTTPS · CACHE ERROR · V36';
               locationStatus.textContent = '离线缓存暂未启用；报告填写和签字功能仍可正常使用。';
             });
         });
